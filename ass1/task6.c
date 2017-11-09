@@ -6,14 +6,10 @@
 #include<sys/types.h>
 #include<unistd.h>
 
-int main(int argc, char* argv[])
+int alloc_mem()
 {
 	off_t buffer_size = 1UL << 40; // 1 TB
-	off_t phys_mem_offset = 1UL << 30; // 1GB
 	char *buffer = (char*)mmap(NULL, (size_t) buffer_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	int phys_mem_fd;
-	int i;
-	unsigned char c;
 	
 	if(buffer == MAP_FAILED)
 	{
@@ -28,6 +24,16 @@ int main(int argc, char* argv[])
 		perror("Failed to unmap memory.");
 		return -1;
 	}
+	
+	return 0;
+}
+
+int print_phys_mem()
+{
+	int i;
+	int phys_mem_fd;
+	off_t phys_mem_offset = 1UL << 30; // 1GB
+	unsigned char c;
 	
 	phys_mem_fd = open("/dev/mem", O_RDONLY);
 	
@@ -59,5 +65,20 @@ int main(int argc, char* argv[])
 	close(phys_mem_fd);
 	
 	return 0;
+}
+
+int main(int argc, char* argv[])
+{
+	if(alloc_mem() < 0)
+	{
+		return 1;
+	}
+	
+	if(print_phys_mem() < 0)
+	{
+		return 1;
+	}
+	
+	return 0;	
 }
 
