@@ -14,7 +14,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 	
-	printf("Buffer size: %p\n", (void*) buffer);
+	printf("Buffer address: %p\n", (void*) buffer);
 	
 	if(munmap(buffer, (size_t) buffer_size) < 0)
 	{
