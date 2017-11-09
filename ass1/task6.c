@@ -56,6 +56,8 @@ int main(int argc, char* argv[])
 		printf("<0x%x>", c);
 	}
 	
+	close(phys_mem_fd);
+	
 	return 0;
 }
 
