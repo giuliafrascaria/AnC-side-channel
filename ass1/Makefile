@@ -1,9 +1,11 @@
-task6.o: task6.c
-	gcc -c task6.c -o task6.o
+task6.o: prog.c
+	gcc -c prog.c -o prog.o
 	
-task6: task6.o
-	gcc task6.o -o task6
+task6: prog.o
+	gcc prog.o -o prog
 	
 clean:
-	rm -rf task6.o
-	rm -rf task6
+	rm -rf cached.txt
+	rm -rf uncached.txt
+	rm -rf prog.o
+	rm -rf prog
