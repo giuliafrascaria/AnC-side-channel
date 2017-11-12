@@ -1,68 +1,73 @@
-// #include <linux/module.h>
-// #include <linux/kernel.h>
-// #include <linux/init.h>
-// #include <asm/current.h>
-// #include <asm/uaccess.h>
-// #include <linux/sched.h>
-// #include <linux/fs_struct.h>
-//
-//
-// MODULE_LICENSE("GPL");
-// MODULE_AUTHOR("Giulia");
-// MODULE_DESCRIPTION("cr3 module");
-//
-// unsigned long get_cr3(char __user *buffer, unsigned long len)
-// {
-//   pgd_t * cr3;
-//   unsigned long buf_len;
-//
-//   //this should not be the case but you never know
-//   cr3 = current->mm->pgd;
-//   if(cr3 == NULL)
-//   {
-//     return -1;
-//   }
-//
-//   //returns 0 on success
-//   buf_len = copy_to_user(buffer, (const void *) cr3, len);
-//   printk("cr3 = %p\n", cr3);
-//
-//   return buf_len;
-// }
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <asm/current.h>
 #include <asm/uaccess.h>
 #include <linux/sched.h>
-#include <linux/fs_struct.h>
+#include <linux/fs.h>		
+#include <linux/proc_fs.h>	
+#include <linux/seq_file.h>	
 
 MODULE_LICENSE("GPL");
 
-void* get_cr3(char __user *buffer, unsigned long len)
+static struct proc_dir_entry* cr3_file;
+
+void* get_cr3(void)
 {
   pgd_t * cr3;
-  unsigned long buf_len;
 
   //this should not be the case but you never know
   cr3 = current->mm->pgd;
   if(cr3 == NULL)
   {
-    return -1;
+    return NULL;
   }
   return cr3;
 }
 
-int __init module_load(void){
 
-	printk( KERN_ALERT "LOADing \n your cr3 address is %p\n", get_cr3);
-	return -1; // Means that kernel module always fails during installation, Kernel module won't be in a loaded modules list
-}
+ static int cr3_show(struct seq_file *m, void *v)
+ {
+     seq_printf(m, "%p\n", (void*) get_cr3());
+     return 0;
+ }
 
-void __exit module_cleanup(void){
-	return;
-}
+ static int cr3_open(struct inode *inode, struct file *file)
+ {
+     return single_open(file, cr3_show, NULL);
+ }
 
-module_init(module_load);
-module_exit(module_cleanup);
+ static const struct file_operations cr3_file_operations = {
+     .owner	= THIS_MODULE,
+     .open	= cr3_open,
+     .read	= seq_read,
+     .llseek	= seq_lseek,
+     .release	= single_release,
+ };
+
+ static int cr3_init(void)
+ {
+     cr3_file = proc_create_data("cr3", 0, NULL, &cr3_file_operations, NULL);
+
+ /*    if (cr3_file) {
+     	cr3_file->proc_fops = &cr3_file_operations;
+     }
+	
+     cr3_file = proc_create("cr3", 0, NULL, &cr3_file_operations);
+*/
+
+     if(!cr3_file){
+	return -1;
+     }
+
+     return 0;
+ }
+
+ static void cr3_exit(void)
+ {
+     remove_proc_entry("cr3", NULL);
+ }
+
+ module_init(cr3_init);
+ module_exit(cr3_exit);
+

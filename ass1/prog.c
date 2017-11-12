@@ -195,9 +195,25 @@ int print_phys_mem()
 
 		printf("<0x%x>", c);
 	}
-
+	printf("\n");
 	close(phys_mem_fd);
 
+	return 0;
+}
+
+int print_page_table_root(){
+	char buffer[8];
+	FILE* f = fopen("/proc/cr3", "r");
+	if(f == NULL){
+		return -1;	
+	}
+        size_t root = fread(buffer, 1, 8, f);
+        if(root < 0) {
+		fclose(f);
+		return -1; 	
+	}
+	printf("CR3 value is: %p\n", buffer);
+	fclose(f);
 	return 0;
 }
 
@@ -214,6 +230,11 @@ int main(int argc, char* argv[])
 	}
 
 	if(print_phys_mem() < 0)
+	{
+		return 1;
+	}
+
+	if(print_page_table_root() < 0)
 	{
 		return 1;
 	}
