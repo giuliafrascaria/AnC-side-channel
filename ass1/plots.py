@@ -24,10 +24,11 @@ def main():
 	
 	fig = plt.figure()
 	
-	plt.plot(cached, 'g')
-	plt.plot(uncached, 'r')
+	plt.plot(cached, color='green', label='cached')
+	plt.plot(uncached, color='red', label='uncached')
 	plt.ylabel('Clock ticks')
 	plt.xlabel('Experiment number')
+	plt.legend(loc='best')
 	
 	if os.path.exists(fig_filepath):
 		os.remove(fig_filepath)
