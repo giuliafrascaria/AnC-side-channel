@@ -23,14 +23,21 @@ def main():
 	uncached_values = [int(line) for line in open(uncached_filepath)]
 	
 	fig = plt.figure()
-	
-	fig.suptitle('Memory access profiles for 1000 cached and 1000 uncached accesses')
-	plt.hist(cached, bins=range(min(cached), max(cached), 5), color='green', label='cached')
-	plt.hist(uncached, bins=range(min(uncached), max(uncached), 5), color='red', label='uncached')
-	plt.xlabel('Clock ticks')
-	plt.ylabel('Frequency (number of experiments)')
-	plt.legend(loc='best')
 
+	fig, (cached, uncached) = plt.subplots(2, sharex=True, sharey=True)
+	
+	cached.hist(cached_values, color='blue', bins=3)
+	cached.set_title('Cached')
+	
+	uncached.hist(uncached_values, color='red', bins=40)
+	uncached.set_title('Uncached')
+	
+	fig.subplots_adjust(hspace=0.5)
+	plt.setp([a.get_xticklabels() for a in fig.axes], visible=True)
+
+	fig.text(0.5, 0.01, 'Clock ticks', ha='center')
+	fig.text(0.03, 0.5, 'Experiment number', va='center', rotation='vertical')
+	
 	if os.path.exists(fig_filepath):
 		os.remove(fig_filepath)
 	
@@ -38,4 +45,3 @@ def main():
 
 if __name__ == "__main__":
 	main()
-
