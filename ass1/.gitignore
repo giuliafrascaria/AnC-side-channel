@@ -1,6 +1,10 @@
 prog
 cached.txt
 uncached.txt
+mod/cr3.mod.c
+mod/modules.order  
+mod/Module.symvers
+
 
 # Compiled source #
 ###################
@@ -10,6 +14,7 @@ uncached.txt
 *.exe
 *.o
 *.so
+*.ko
 
 # Packages #
 ############

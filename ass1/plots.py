@@ -19,8 +19,8 @@ def main():
 		print("%s not found" % uncached_filepath)
 		return
 		
-	cached = [int(line) for line in open(cached_filepath)]
-	uncached = [int(line) for line in open(uncached_filepath)]
+	cached_values = [int(line) for line in open(cached_filepath)]
+	uncached_values = [int(line) for line in open(uncached_filepath)]
 	
 	fig = plt.figure()
 	
@@ -30,7 +30,7 @@ def main():
 	plt.xlabel('Clock ticks')
 	plt.ylabel('Frequency (number of experiments)')
 	plt.legend(loc='best')
-	
+
 	if os.path.exists(fig_filepath):
 		os.remove(fig_filepath)
 	

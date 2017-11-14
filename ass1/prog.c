@@ -149,8 +149,8 @@ int print_page_table_root(){
 		return -1;	
 	}
     
-    if(fread(buffer, 1, 8, f) < 0)
-    {
+    	if(fread(buffer, 1, 8, f) < 0)
+    	{
 		fclose(f);
 		return -1; 	
 	}
