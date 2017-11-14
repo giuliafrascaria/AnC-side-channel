@@ -19,16 +19,24 @@ def main():
 		print("%s not found" % uncached_filepath)
 		return
 		
-	cached = [int(line) for line in open(cached_filepath)]
-	uncached = [int(line) for line in open(uncached_filepath)]
+	cached_values = [int(line) for line in open(cached_filepath)]
+	uncached_values = [int(line) for line in open(uncached_filepath)]
 	
 	fig = plt.figure()
+
+	fig, (cached, uncached) = plt.subplots(2, sharex=True, sharey=True)
 	
-	plt.plot(cached, color='green', label='cached')
-	plt.plot(uncached, color='red', label='uncached')
-	plt.ylabel('Clock ticks')
-	plt.xlabel('Experiment number')
-	plt.legend(loc='best')
+	cached.hist(cached_values, color='green', bins=40)
+	cached.set_title('Cached')
+	
+	uncached.hist(uncached_values, color='red', bins=40)
+	uncached.set_title('Uncached')
+	
+	fig.subplots_adjust(hspace=0.5)
+	plt.setp([a.get_xticklabels() for a in fig.axes], visible=True)
+
+	fig.text(0.5, 0.01, 'Clock ticks', ha='center')
+	fig.text(0.03, 0.5, 'Experiment number', va='center', rotation='vertical')
 	
 	if os.path.exists(fig_filepath):
 		os.remove(fig_filepath)
