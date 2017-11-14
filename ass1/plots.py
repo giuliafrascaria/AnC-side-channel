@@ -24,10 +24,11 @@ def main():
 	
 	fig = plt.figure()
 	
-	plt.plot(cached, color='green', label='cached')
-	plt.plot(uncached, color='red', label='uncached')
-	plt.ylabel('Clock ticks')
-	plt.xlabel('Experiment number')
+	fig.suptitle('Memory access profiles for 1000 cached and 1000 uncached accesses')
+	plt.hist(cached, bins=range(min(cached), max(cached), 5), color='green', label='cached')
+	plt.hist(uncached, bins=range(min(uncached), max(uncached), 5), color='red', label='uncached')
+	plt.xlabel('Clock ticks')
+	plt.ylabel('Frequency (number of experiments)')
 	plt.legend(loc='best')
 	
 	if os.path.exists(fig_filepath):
