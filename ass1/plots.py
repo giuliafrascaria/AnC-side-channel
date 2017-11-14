@@ -26,7 +26,7 @@ def main():
 
 	fig, (cached, uncached) = plt.subplots(2, sharex=True, sharey=True)
 	
-	cached.hist(cached_values, color='green', bins=40)
+	cached.hist(cached_values, color='blue', bins=3)
 	cached.set_title('Cached')
 	
 	uncached.hist(uncached_values, color='red', bins=40)
