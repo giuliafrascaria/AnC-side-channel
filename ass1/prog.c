@@ -2,12 +2,13 @@
 #include<fcntl.h>
 #include<stdint.h>
 #include<stdio.h>
+#include<stdlib.h>
 #include<sys/mman.h>
 #include<sys/stat.h>
 #include<sys/types.h>
 #include<unistd.h>
 
-void profile_mem_access(volatile char *buffer, off_t buffer_size, int cached, char *filename)
+void profile_mem_access(volatile char* c, int cached, char* filename)
 {
 	int i;
 	unsigned long long hi1, lo1;
@@ -26,7 +27,7 @@ void profile_mem_access(volatile char *buffer, off_t buffer_size, int cached, ch
 	{
 		if(cached == 0)
 		{
-			asm volatile("clflush 0(%0)\n" : : "c"(buffer) : "rax");
+			asm volatile("clflush 0(%0)\n" : : "c"(c) : "rax");
 		}
 
 		asm volatile ("mfence\n\t"
@@ -35,7 +36,7 @@ void profile_mem_access(volatile char *buffer, off_t buffer_size, int cached, ch
 							"mov %%rdx, %0\n\t"
 							"mov %%rax, %1\n\t" : "=r"(hi1), "=r"(lo1) : : "%rax", "%rbx", "%rcx", "%rdx");
 
-		asm volatile("movq (%0), %%rax\n" : : "c"(buffer) : "rax");
+		asm volatile("movq (%0), %%rax\n" : : "c"(c) : "rax");
 
 		asm volatile ("RDTSCP\n\t"
 							"mov %%rdx, %0\n\t"
@@ -59,23 +60,18 @@ void profile_mem_access(volatile char *buffer, off_t buffer_size, int cached, ch
 
 int profile_memory()
 {
-	off_t buffer_size = sizeof(char);
-	volatile char *buffer = (char*)mmap(NULL, (size_t) buffer_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	volatile char* c = (char*)malloc(sizeof(char));
 
-	if(buffer == MAP_FAILED)
+	if(c == NULL)
 	{
-		perror("Failed to map memory.");
+		perror("Failed to allocate memory for profiling.");
 		return -1;
 	}
 
-	profile_mem_access(buffer, buffer_size, 0, "uncached.txt");
-	profile_mem_access(buffer, buffer_size, 1, "cached.txt");
+	profile_mem_access(c, 0, "uncached.txt");
+	profile_mem_access(c, 1, "cached.txt");
 
-	if(munmap((void*) buffer, (size_t) buffer_size) < 0)
-	{
-		perror("Failed to unmap memory.");
-		return -1;
-	}
+	free((void*)c);
 
 	return 0;
 }
