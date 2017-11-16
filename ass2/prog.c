@@ -82,7 +82,7 @@ int profile_memory()
 	return 0;
 }
 
-int alloc_mem()
+char* alloc_mem()
 {
 	off_t buffer_size = 1UL << 40; // >1 TB
 	volatile char *buffer = (char*)mmap(NULL, (size_t) buffer_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -93,59 +93,19 @@ int alloc_mem()
 		return -1;
 	}
 
-	printf("Buffer address: %p\n", (void*) buffer);
+	//printf("Buffer address: %p\n", (void*) buffer);
 
-	if(munmap((void*) buffer, (size_t) buffer_size) < 0)
+	/*if(munmap((void*) buffer, (size_t) buffer_size) < 0)
 	{
 		perror("Failed to unmap memory.");
 		return -1;
-	}
-
-	return 0;
+	}*/
+	return buffer;
+	
 }
 
-int print_phys_mem()
-{
-	int i;
-	int phys_mem_fd;
-	off_t phys_mem_offset = 1UL << 30; // >1GB
-	unsigned char c;
 
-	phys_mem_fd = open("/dev/mem", O_RDONLY);
-
-	if(phys_mem_fd < 0)
-	{
-		perror("Failed to open /dev/mem");
-		return -1;
-	}
-
-	if(lseek(phys_mem_fd, phys_mem_offset, SEEK_SET) < 0)
-	{
-		perror("Failed to seek in /dev/mem");
-		return -1;
-	}
-
-	printf("The followind 10 bytes were read from /dev/mem: ");
-
-	// print 10 bytes from physical memory at address >=1GB
-	for(i = 0; i < 10; i++)
-	{
-		if(read(phys_mem_fd, &c, sizeof(c)) < 0)
-		{
-			perror("Failed to read from /dev/mem");
-			close(phys_mem_fd);
-			return -1;
-		}
-
-		printf("<0x%x> ", c);
-	}
-	printf("\n");
-	close(phys_mem_fd);
-
-	return 0;
-}
-
-int print_page_table_root(){
+unsigned long get_page_table_root(){
 	unsigned long val;
 
 	FILE* f = fopen("/proc/cr3", "rb");
@@ -164,12 +124,32 @@ int print_page_table_root(){
 	printf("CR3 value is: %lx\n", val);
 	fclose(f);
 
-	return 0;
+	return val;
+}
+
+unsigned long createMask(unsigned long a, unsigned long b)
+{
+   unsigned long r = 0;
+   for (unsigned i=a; i<=b; i++)
+       r |= 1 << i;
+
+   return r;
 }
 
 int main(int argc, char* argv[])
-{
-	if(alloc_mem() < 0)
+{	
+	unsigned long cr3, buffer_address;
+	off_t buffer_size = 1UL << 40; // >1 TB
+	volatile char *buffer = (char*)mmap(NULL, (size_t) buffer_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	buffer_address = &buffer;
+
+	if(buffer == MAP_FAILED)
+	{
+		perror("Failed to map memory.");
+		return -1;
+	}
+
+	/*if(alloc_mem(buffer_address) < 0)
 	{
 		return -1;
 	}
@@ -177,17 +157,29 @@ int main(int argc, char* argv[])
 	if(profile_memory() < 0)
 	{
 		return -1;
-	}
+	}*/
 
-	if(print_phys_mem() < 0)
+	if((cr3 = get_page_table_root()) < 0)
 	{
 		return -1;
 	}
-
-	if(print_page_table_root() < 0)
-	{
-		return -1;
+	
+	printf("Buffer address 0x%lx\n", buffer_address);
+	printf("Cr3 0x%lx\n", cr3);
+	int fd = open("/dev/mem", O_RDWR);
+	unsigned long* page_table_root = (unsigned long*)mmap(NULL,  4 * 1024, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, cr3);
+	printf("Root is %p\n", page_table_root);
+	if(page_table_root == NULL){
+		perror("BLA");	
 	}
+	printf("mask is 0x%lx\n", createMask(40, 49));
+	unsigned long index_in_ptl4 = 0;
+	//unsigned long ptl3_phys_addr = page_table_root[index_in_ptl4];
+	
+	printf("PLT4 index is %lu\n", buffer_address & createMask(40, 49));
+/*
+	printf("PLT3 table address is 0x%lx\n", ptl3_phys_addr);
+	*/
 
 	return 0;
 }
