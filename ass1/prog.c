@@ -118,7 +118,7 @@ int print_phys_mem()
 		perror("Failed to seek in /dev/mem");
 		return -1;
 	}
-	
+
 	printf("The followind 10 bytes were read from /dev/mem: ");
 
 	// print 10 bytes from physical memory at address >=1GB
@@ -140,24 +140,24 @@ int print_phys_mem()
 }
 
 int print_page_table_root(){
-	char buffer[8];
-	
+	unsigned long buffer;
+
 	FILE* f = fopen("/proc/cr3", "r");
-	
+
 	if(f == NULL)
 	{
-		return -1;	
+		return -1;
 	}
-    
-    	if(fread(buffer, 1, 8, f) < 0)
+
+    	if(fread(&buffer, sizeof(unsigned long), 1, f) < 0)
     	{
-		fclose(f);
-		return -1; 	
-	}
-	
-	printf("CR3 value is: %p\n", buffer);
+				fclose(f);
+				return -1;
+			}
+
+	printf("CR3 value is: 0x%lx\n", buffer);
 	fclose(f);
-	
+
 	return 0;
 }
 
@@ -175,7 +175,7 @@ int main(int argc, char* argv[])
 
 	if(print_phys_mem() < 0)
 	{
-		return -1;
+		//return -1;
 	}
 
 	if(print_page_table_root() < 0)
@@ -185,4 +185,3 @@ int main(int argc, char* argv[])
 
 	return 0;
 }
-

@@ -4,27 +4,58 @@
 #include <asm/current.h>
 #include <asm/uaccess.h>
 #include <linux/sched.h>
-#include <linux/fs.h>		
-#include <linux/proc_fs.h>	
-#include <linux/seq_file.h>	
+#include <linux/pid.h>
+#include <asm/io.h>
+#include <linux/fs.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 MODULE_LICENSE("GPL");
 
 static struct proc_dir_entry* cr3_file;
 
-void* get_cr3(void)
+unsigned long get_cr3(void)
 {
-  pgd_t * cr3;
-  
-  cr3 = current->mm->pgd;
 
-  return cr3;
+      unsigned long cr3;
+      asm volatile(
+
+          "mov %%cr3, %%rax\n\t"
+          "mov %%rax, %0\n\t"
+      :  "=m" (cr3)
+      : /* no input */
+      : "%rax"
+      );
+
+
+
+      printk("cr3 = 0x%lx\n", cr3);
+
+
+      pgd_t * k_cr3;
+      unsigned long phys_cr3;
+
+      k_cr3 = current->mm->pgd;
+      phys_cr3= virt_to_phys((void *) k_cr3);
+      printk("cr3 hi %lx\n", phys_cr3);
+
+
+      return cr3;
+
+
+
+  //phys_cr3 = __pa_symbol((void *) cr3);
+
+  // return phys_cr3;
+
+
 }
 
 
 static int cr3_show(struct seq_file *m, void *v)
 {
-    seq_printf(m, "%p\n", (void*) get_cr3());
+    printk("cr3 lala %lx\n", get_cr3());
+    seq_printf(m, "%lx\n", get_cr3());
     return 0;
 }
 
@@ -60,4 +91,3 @@ static void cr3_exit(void)
 
 module_init(cr3_init);
 module_exit(cr3_exit);
-
