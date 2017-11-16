@@ -14,6 +14,8 @@ void profile_mem_access(volatile char* c, int cached, char* filename)
 	unsigned long long hi1, lo1;
 	unsigned long long hi, lo;
 	uint64_t t, old, new;
+	off_t j, buf_size = 64 * 1024 * 1024, maxj = (64 * 1024 * 1024) / sizeof(int);
+	int* buffer = (int*)malloc(buf_size);
 
 	FILE *f = fopen(filename, "ab+");
 
@@ -27,7 +29,11 @@ void profile_mem_access(volatile char* c, int cached, char* filename)
 	{
 		if(cached == 0)
 		{
-			asm volatile("clflush 0(%0)\n" : : "c"(c) : "rax");
+			for(j = 0; j<maxj; j++)
+			{
+				buffer[j] = rand();
+			}
+//			asm volatile("clflush 0(%0)\n" : : "c"(c) : "rax");
 		}
 
 		asm volatile ("mfence\n\t"
@@ -140,22 +146,22 @@ int print_phys_mem()
 }
 
 int print_page_table_root(){
-	unsigned long buffer;
+	unsigned long val;
 
-	FILE* f = fopen("/proc/cr3", "r");
+	FILE* f = fopen("/proc/cr3", "rb");
 
 	if(f == NULL)
 	{
 		return -1;
 	}
+	
+	if(fscanf(f, "%lu\n", &val) < 0)
+	{
+		fclose(f);
+		return -1;
+	}
 
-    	if(fread(&buffer, sizeof(unsigned long), 1, f) < 0)
-    	{
-				fclose(f);
-				return -1;
-			}
-
-	printf("CR3 value is: 0x%lx\n", buffer);
+	printf("CR3 value is: %lx\n", val);
 	fclose(f);
 
 	return 0;
@@ -175,7 +181,7 @@ int main(int argc, char* argv[])
 
 	if(print_phys_mem() < 0)
 	{
-		//return -1;
+		return -1;
 	}
 
 	if(print_page_table_root() < 0)

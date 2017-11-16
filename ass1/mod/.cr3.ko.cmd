@@ -1,1 +1,0 @@
-cmd_/home/giogge/Documenti/sss/secure_software/ass1/mod/cr3.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/giogge/Documenti/sss/secure_software/ass1/mod/cr3.ko /home/giogge/Documenti/sss/secure_software/ass1/mod/cr3.o /home/giogge/Documenti/sss/secure_software/ass1/mod/cr3.mod.o

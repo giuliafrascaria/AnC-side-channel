@@ -54,8 +54,8 @@ unsigned long get_cr3(void)
 
 static int cr3_show(struct seq_file *m, void *v)
 {
-    printk("cr3 lala %lx\n", get_cr3());
-    seq_printf(m, "%lx\n", get_cr3());
+    printk("cr3 lala %lu\n", get_cr3());
+    seq_printf(m, "%lu\n", get_cr3());
     return 0;
 }
 
