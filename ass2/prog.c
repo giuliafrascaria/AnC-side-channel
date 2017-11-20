@@ -111,7 +111,7 @@ void profile_mem_access(volatile unsigned char* c, int* buffer, size_t cache_flu
 		c[1] = 0xc3; //ret
 	}
 
-	for(i = 0; i < 10; i++)
+	for(i = 0; i < 1000; i++)
 	{
 		if(evict_itlb(ev_set, ev_set_size) < 0)
 		{
@@ -238,7 +238,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 	
-	get_phys_addr(buffer, buffer_size);
+	get_phys_addr(target, target_size);
 
 	// TODO store convenient instructions in 512(?) page offsets in buffer
 
