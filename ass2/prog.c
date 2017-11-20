@@ -91,6 +91,7 @@ void profile_mem_access(volatile unsigned char* c, int* buffer, size_t cache_flu
 	unsigned long long hi, lo;
 	uint64_t t, old, new;
 	int maxj = cache_flush_set_size / sizeof(int);
+	fp ptr; // pointer to function stored in the target buffer
 	FILE *f = fopen(filename, "ab+");
 
 	if(f == NULL)
@@ -103,6 +104,7 @@ void profile_mem_access(volatile unsigned char* c, int* buffer, size_t cache_flu
 	{
 		c[0] = 0x90; //nop
 		c[1] = 0xc3; //ret
+		ptr = (fp)&(c[0]);
 	}
 
 	for(i = 0; i < 100; i++)
@@ -121,8 +123,7 @@ void profile_mem_access(volatile unsigned char* c, int* buffer, size_t cache_flu
 
 		if(touch == 1)
 		{
-			fp ptr = (fp)&(c[0]);
-			ptr();
+			ptr(); // execute function in target buffer
 		}
 
 		asm volatile ("mfence\n\t"
@@ -232,9 +233,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 	
-	//get_phys_addr(target, target_size);
-
-	// TODO store convenient instructions in 512(?) page offsets in buffer
+	get_phys_addr(target, target_size);
 
 	profile_mem_access(target, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 0, "uncached.txt");
 	profile_mem_access(target, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 1, "hopefully_cached.txt");
@@ -242,8 +241,6 @@ int main(int argc, char* argv[])
 	munmap((void*) target, target_size);
 	munmap((void*) ev_set, ev_set_size);
 	free(cache_flush_set);
-
-	//profiling(buffer, "cached.txt", "uncached.txt", 0);
 
 	return 0;
 }
