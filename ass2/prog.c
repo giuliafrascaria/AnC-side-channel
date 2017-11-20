@@ -11,12 +11,7 @@
 
 #define PAGE_SIZE 4096
 
-typedef void (*fp)();
-
-void nop()
-{
-	return;
-}
+typedef void (*fp)(void);
 
 // returns the CR3 register value (physical address of PGD)
 unsigned long get_page_table_root()
@@ -60,15 +55,16 @@ unsigned long get_physical_addr(int fd, unsigned long page_phys_addr, unsigned l
 	return ret;
 }
 
-fp* create_eviction_set(size_t size)
+unsigned char* create_eviction_set(size_t size)
 {
-	fp *buffer = (fp*)mmap(NULL, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);;
+	unsigned char *buffer = (unsigned char*)mmap(NULL, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);;
 
 	if(buffer != NULL)
 	{
 		for(int i = 0; i < size; i += PAGE_SIZE)
 		{
-			buffer[i] = nop;
+			buffer[i] = 0x90; //nop
+			buffer[i+1] = 0xc3; //ret
 		}
 	} else {
 		perror("Failed to allocate memory for eviction set");
@@ -77,7 +73,7 @@ fp* create_eviction_set(size_t size)
 	return buffer;
 }
 
-int evict_itlb(fp *buffer, size_t size)
+int evict_itlb(unsigned char *buffer, size_t size)
 {
 	if(buffer == NULL)
 	{
@@ -87,13 +83,14 @@ int evict_itlb(fp *buffer, size_t size)
 	// execute eviction set instructions
 	for(int i = 0; i < size; i += PAGE_SIZE)
 	{
-		buffer[i]();
+			fp ptr = (fp)(&(buffer[i]));
+			ptr();
 	}
 	
 	return 0;
 }
 
-void profile_mem_access(volatile fp* c, int* buffer, size_t cache_flush_set_size, fp* ev_set, size_t ev_set_size, int touch, char* filename)
+void profile_mem_access(volatile unsigned char* c, int* buffer, size_t cache_flush_set_size, unsigned char* ev_set, size_t ev_set_size, int touch, char* filename)
 {
 	int i, j, k;
 	unsigned long long hi1, lo1;
@@ -110,7 +107,8 @@ void profile_mem_access(volatile fp* c, int* buffer, size_t cache_flush_set_size
 	
 	if(touch == 1)
 	{
-		c[0] = nop;
+		c[0] = 0x90; //nop
+		c[1] = 0xc3; //ret
 	}
 
 	for(i = 0; i < 10; i++)
@@ -121,7 +119,6 @@ void profile_mem_access(volatile fp* c, int* buffer, size_t cache_flush_set_size
 			fclose(f);
 			return;
 		}
-		
 		// evict cache
 		for(j = 0; j<maxj; j++)
 		{
@@ -130,7 +127,8 @@ void profile_mem_access(volatile fp* c, int* buffer, size_t cache_flush_set_size
 
 		if(touch == 1)
 		{
-			c[0]();
+			fp ptr = (fp)&(c[0]);
+			ptr();
 		}
 
 		asm volatile ("mfence\n\t"
@@ -162,7 +160,7 @@ void profile_mem_access(volatile fp* c, int* buffer, size_t cache_flush_set_size
 	fclose(f);
 }
 
-unsigned long get_phys_addr(volatile fp *buffer, off_t buffer_size)
+unsigned long get_phys_addr(volatile unsigned char *buffer, off_t buffer_size)
 {
 	unsigned long buffer_address = (unsigned long) &buffer;
 	unsigned long page_table_offset;
@@ -209,11 +207,11 @@ unsigned long get_phys_addr(volatile fp *buffer, off_t buffer_size)
 int main(int argc, char* argv[])
 {
 	size_t target_size = 1UL << 40; // >1 TB
-	size_t cache_flush_set_size = 64 * 1024 * 1024; // 64 MB
-	size_t ev_set_size = 512 * PAGE_SIZE;
+	size_t cache_flush_set_size = 10 * 1024 * 1024; // 64 MB
+	size_t ev_set_size = 128 * PAGE_SIZE;
 	int * cache_flush_set;
-	volatile fp *target = (fp*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	fp *ev_set;
+	volatile unsigned char *target = (unsigned char*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	unsigned char *ev_set;
 	
 	if(target == MAP_FAILED)
 	{
@@ -240,7 +238,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 	
-	//get_phys_addr(buffer, buffer_size);
+	get_phys_addr(buffer, buffer_size);
 
 	// TODO store convenient instructions in 512(?) page offsets in buffer
 
