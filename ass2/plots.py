@@ -26,10 +26,10 @@ def main():
 
 	fig, (cached, uncached) = plt.subplots(2, sharex=True, sharey=True)
 	
-	cached.hist(uncached_values, color='red', bins=3)
+	cached.hist(uncached_values, color='red', bins=100)
 	cached.set_title('Uncached')
 
-	uncached.hist(cached_values, color='blue', bins=40)
+	uncached.hist(cached_values, color='blue', bins=100)
 	uncached.set_title('Touched')
 
 	fig.subplots_adjust(hspace=0.5)
@@ -45,3 +45,4 @@ def main():
 
 if __name__ == "__main__":
 	main()
+
