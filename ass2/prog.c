@@ -9,7 +9,19 @@
 #include<unistd.h>
 #include<string.h>
 
-unsigned long get_page_table_root(){
+#define PAGE_SIZE 4096
+
+typedef void (*fp)(void);
+
+void nop()
+{
+	asm volatile("nop");
+	return;
+}
+
+// returns the CR3 register value (physical address of PGD)
+unsigned long get_page_table_root()
+{
 	unsigned long val;
 
 	FILE* f = fopen("/proc/cr3", "rb");
@@ -35,190 +47,64 @@ unsigned long get_physical_addr(int fd, unsigned long page_phys_addr, unsigned l
 	unsigned long ret;
 	unsigned long *page;
 
-	page = (unsigned long*) mmap(NULL,  4 * 1024, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, page_phys_addr);
+	page = (unsigned long*) mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, page_phys_addr);
 
 	if(page == NULL)
 	{
 		return 0;
 	}
 
-	ret = page[offset] & 0xfffffffffffff000;
+	ret = page[offset] & 0xfffffffffffff000; // discard lowest 12 bits
 
-	munmap((void*) page, 4 * 1024);
+	munmap((void*) page, PAGE_SIZE);
 
 	return ret;
 }
 
-void evict_line( char * file, int offset)
+fp* create_eviction_set(off_t size, int offset)
 {
+	fp *buffer = (fp *)mmap(NULL, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
 
-	int pg_index;
-	char place_holder[8] = "lovecats" ;
-	off_t buf_size = 512* 4096;
-	char * buffer = (char *)malloc(buf_size);
-
-
-	//eviction set = 20 pages, a cache line should be 64 byte anyway, with 8 bytes per entry
-	for(int j = 0; j < 256; j++)
+	if(buffer != NULL)
 	{
-		//printf("access %d\n", j);
-		pg_index = j*4096;
-		strcpy(&buffer[pg_index], (char *) place_holder);
-	}
-
-	free(buffer);
-}
-
-void fill_buffer(unsigned char * buffer, ssize_t len)
-{
-	//nop ret in assembly x86
-	unsigned char nop_instruction[] = {0x90, 0xC3};
-
-	//fill the buffer with instructions
-	for(int i = 0; i < len; i+2)
-	{
-		strncpy(buffer[i], nop_instruction, 2);
-	}
-
-}
-
-void evict_itlb(int offset)
-{
-
-	int pg_index;
-
-	//I have to fill with nop
-	off_t buf_size = 512* 4096;
-	//char * buffer = (char *)malloc(buf_size);//I probably have to change to mmap to use prot_exec
-
-	unsigned char *buffer = (char *)mmap(NULL, buf_size, PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
-
-	fill_buffer(buffer, buf_size);
-
-	//eviction set = 20 pages, a cache line should be 64 byte anyway, with 8 bytes per entry
-	for(int j = 0; j < 256; j++)
-	{
-		//printf("access %d\n", j);
-		pg_index = j*4096;
-		((void(*)(void))(buffer[pg_index + offset]))();
-	}
-
-	free(buffer);
-}
-
-void profiling(volatile char * buf, char * file, char * file2, int offset)
-{
-	printf("hellou\n");
-	int pg_index;
-	char place_holder[8] = "lovecats" ;
-	unsigned long long hi1, lo1;
-	unsigned long long hi, lo;
-	uint64_t t, old, new;
-	off_t buf_size = 512* 4096;
-	char * buffer = (char *)malloc(buf_size);
-
-	FILE *f = fopen(file, "ab+");
-
-	if(f == NULL)
-	{
-		perror("Failed to open file for printing memory access profiles");
-		return;
-	}
-
-	FILE *f2 = fopen(file2, "ab+");
-
-	if(f == NULL)
-	{
-		perror("Failed to open file for printing memory access profiles");
-		return;
-	}
-
-	for(int i = 0; i < 1000; i++)
-	{
-		//eviction set = 20 pages, a cache line should be 8 byte anyway
-		for(int j = 0; j < 256; j++)
+		for(off_t i = offset; i < size; i += PAGE_SIZE)
 		{
-			//printf("access %d\n", j);
-			pg_index = j*4096;
-			strcpy(&buffer[pg_index], (char *) place_holder);
-
-			//profile the same access right after filling it, this is my cached time
-			asm volatile ("mfence\n\t"
-								"CPUID\n\t"
-								"RDTSC\n\t"
-								"mov %%rdx, %0\n\t"
-								"mov %%rax, %1\n\t" : "=r"(hi1), "=r"(lo1) : : "%rax", "%rbx", "%rcx", "%rdx");
-
-			//asm volatile("movq (%0), %%rax\n" : : "c"(buffer[pg_index]) : "rax");
-			buffer[pg_index] = "L";
-
-			asm volatile ("RDTSCP\n\t"
-								"mov %%rdx, %0\n\t"
-								"mov %%rax, %1\n\t"
-								"CPUID\n\t"
-								"mfence" : "=r"(hi), "=r"(lo) : : "%rax", "%rbx", "%rcx", "%rdx");
-
-
-			old = (uint64_t) (hi1 << 32) | lo1;
-			new = (uint64_t) (hi << 32) | lo;
-			t = new - old;
-
-			if(fprintf(f, "%llu\n", (unsigned long long) t) < 0)
-			{
-				fclose(f);
-				perror("Failed to print memory access");
-			}
+			buffer[i] = nop;
 		}
-
-		for(int j = 0; j < 256; j++)
-		{
-			//printf("access %d\n", j);
-			pg_index = j*4096;
-			//strcpy(&buffer[pg_index], (char *) place_holder);
-
-			//profile the same access right after filling it, this is my cached time
-			asm volatile ("mfence\n\t"
-								"CPUID\n\t"
-								"RDTSC\n\t"
-								"mov %%rdx, %0\n\t"
-								"mov %%rax, %1\n\t" : "=r"(hi1), "=r"(lo1) : : "%rax", "%rbx", "%rcx", "%rdx");
-
-			//asm volatile("movq (%0), %%rax\n" : : "c"(buffer[pg_index]) : "rax");
-			buffer[pg_index] = "L";
-
-			asm volatile ("RDTSCP\n\t"
-								"mov %%rdx, %0\n\t"
-								"mov %%rax, %1\n\t"
-								"CPUID\n\t"
-								"mfence" : "=r"(hi), "=r"(lo) : : "%rax", "%rbx", "%rcx", "%rdx");
-
-
-			old = (uint64_t) (hi1 << 32) | lo1;
-			new = (uint64_t) (hi << 32) | lo;
-			t = new - old;
-
-			if(fprintf(f2, "%llu\n", (unsigned long long) t) < 0)
-			{
-				fclose(f2);
-				perror("Failed to print memory access");
-			}
-		}
-		//now the cache line should be full
+	} else {
+		perror("Failed to allocate memory for eviction set");
 	}
-	fclose(f);
-	fclose(f2);
+	
+	return buffer;
 }
 
-void profile_mem_access(volatile char* c, int touch, char* filename)
+int evict_itlb(fp *buffer, off_t size, int offset)
+{
+	if(buffer == NULL)
+	{
+		return -1;
+	}
+	
+	// execute eviction set instructions
+	for(off_t j = offset; j < size; j += PAGE_SIZE)
+	{
+		buffer[j]();
+	}
+	
+	return 0;
+}
+
+void profile_mem_access(volatile fp* c, int touch, char* filename)
 {
 	int i,k;
 	unsigned long long hi1, lo1;
 	unsigned long long hi, lo;
 	uint64_t t, old, new;
 	off_t j, buf_size = 64 * 1024 * 1024, maxj = (64 * 1024 * 1024) / sizeof(int);
-	int* buffer = (int*)malloc(buf_size);
-	volatile char *p;
-
+	int* buffer;
+	fp* ev_set;
+	int offset = 0;
+	off_t ev_set_size = offset + 512 * PAGE_SIZE; // TODO figure out unified TLB size
 	FILE *f = fopen(filename, "ab+");
 
 	if(f == NULL)
@@ -226,9 +112,43 @@ void profile_mem_access(volatile char* c, int touch, char* filename)
 		perror("Failed to open file for printing memory access profiles");
 		return;
 	}
-
-	for(i = 0; i < 1000; i++)
+	
+	buffer = (int*)malloc(buf_size);
+	
+	if(buffer == NULL)
 	{
+		perror("Failed to allocate buffer for flushing cache");
+		fclose(f);
+		return;
+	}
+	
+	ev_set = create_eviction_set(ev_set_size, offset);
+	
+	if(ev_set == NULL)
+	{
+		printf("Failed to create eviction set\n");
+		free(buffer);
+		fclose(f);
+		return;
+	}
+	
+	if(touch == 1)
+	{
+		c[offset] = nop;
+	}
+
+	for(i = 0; i < 10; i++)
+	{
+		if(evict_itlb(ev_set, ev_set_size, offset) < 0)
+		{
+			printf("Failed to evict TLB\n");
+			free(buffer);
+			fclose(f);
+			munmap((void*)ev_set, ev_set_size);
+			return;
+		}
+		
+		// evict cache
 		for(j = 0; j<maxj; j++)
 		{
 			buffer[j] = rand();
@@ -236,14 +156,7 @@ void profile_mem_access(volatile char* c, int touch, char* filename)
 
 		if(touch == 1)
 		{
-			p = c;
-
-			// assuming 8-way associative iTLB with 64 entries
-			// assuming page sizes of 4KB
-			for(k = 0; k < 512; k += 4096)
-			{
-				//execute "convenient" instruction stored at offset k in p
-			}
+			c[offset]();
 		}
 
 		asm volatile ("mfence\n\t"
@@ -266,33 +179,27 @@ void profile_mem_access(volatile char* c, int touch, char* filename)
 
 		if(fprintf(f, "%llu\n", (unsigned long long) t) < 0)
 		{
-			fclose(f);
 			perror("Failed to print memory access");
+			free(buffer);
+			fclose(f);
+			munmap((void*)ev_set, ev_set_size);
+			return;
 		}
 	}
 
+	free(buffer);
 	fclose(f);
+	munmap((void*)ev_set, ev_set_size);
 }
 
-
-
-int main(int argc, char* argv[])
+unsigned long get_phys_addr(volatile fp *buffer, off_t buffer_size)
 {
-	off_t buffer_size = 1UL << 40; // >1 TB
-	volatile char *buffer = (char*)mmap(NULL, (size_t) buffer_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	unsigned long buffer_address = (unsigned long) &buffer;
 	unsigned long page_table_offset;
 	unsigned long page_table_offset_mask = 0x1ff; // last 9 bits
 	unsigned long frame_offset_mask = 0xfff; // last 12 bits
 	unsigned long aux_phys_addr;
 	int fd;
-
-
-	if(buffer == MAP_FAILED)
-	{
-		perror("Failed to map memory.");
-		return -1;
-	}
 
 	if((aux_phys_addr = get_page_table_root()) < 0)
 	{
@@ -323,7 +230,24 @@ int main(int argc, char* argv[])
 	page_table_offset = (buffer_address >> 12) & page_table_offset_mask;
 	aux_phys_addr = get_physical_addr(fd, aux_phys_addr, page_table_offset);
 
-	printf("buffer physical address: 0x%lx\n", aux_phys_addr | (buffer_address & frame_offset_mask));
+	aux_phys_addr = aux_phys_addr | (buffer_address & frame_offset_mask);
+	printf("buffer physical address: 0x%lx\n", aux_phys_addr);
+	
+	return aux_phys_addr;
+}
+
+int main(int argc, char* argv[])
+{
+	off_t buffer_size = 1UL << 40; // >1 TB
+	volatile fp *buffer = (fp*)mmap(NULL, (size_t) buffer_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	
+	if(buffer == MAP_FAILED)
+	{
+		perror("Failed to map memory.");
+		return -1;
+	}
+	
+	//get_phys_addr(buffer, buffer_size);
 
 	// TODO store convenient instructions in 512(?) page offsets in buffer
 
