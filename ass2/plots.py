@@ -10,7 +10,6 @@ fig_filepath = "plots.png"
 def main():
 	cached = []
 	uncached = []
-	hist_bar_width = 25
 
 	if not os.path.exists(cached_filepath):
 		print("%s not found" % cached_filepath)
@@ -26,8 +25,9 @@ def main():
 	fig = plt.figure()
 
 	fig, (cached, uncached) = plt.subplots(2, sharex=True, sharey=True)
-	
-	bins = [i for i in range(max(max(cached_values), max(uncached_values)) + hist_bar_width) if i % hist_bar_width == 0]
+	max_timing = max(max(cached_values), max(uncached_values))
+	hist_bar_width = int(0.008 * max_timing)
+	bins = [i for i in range(max_timing + hist_bar_width) if i % hist_bar_width == 0]
 
 	cached.hist(uncached_values, color='red', bins=bins)
 	cached.set_title('Uncached')

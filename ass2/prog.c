@@ -233,7 +233,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 	
-	get_phys_addr(target, target_size);
+	//get_phys_addr(target, target_size);
 
 	profile_mem_access(target, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 0, "uncached.txt");
 	profile_mem_access(target, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 1, "hopefully_cached.txt");
