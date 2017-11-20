@@ -62,7 +62,7 @@ unsigned long get_physical_addr(int fd, unsigned long page_phys_addr, unsigned l
 
 fp* create_eviction_set(size_t size)
 {
-	fp *buffer = (fp *)malloc(size);
+	fp *buffer = (fp*)mmap(NULL, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);;
 
 	if(buffer != NULL)
 	{
@@ -248,7 +248,7 @@ int main(int argc, char* argv[])
 	profile_mem_access(target, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 1, "hopefully_cached.txt");
 	
 	munmap((void*) target, target_size);
-	free(ev_set);
+	munmap((void*) ev_set, ev_set_size);
 	free(cache_flush_set);
 
 	//profiling(buffer, "cached.txt", "uncached.txt", 0);
