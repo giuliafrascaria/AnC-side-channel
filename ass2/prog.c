@@ -55,42 +55,36 @@ unsigned long get_physical_addr(int fd, unsigned long page_phys_addr, unsigned l
 	return ret;
 }
 
-unsigned char* create_eviction_set(size_t size)
+int evict_itlb(volatile unsigned char *buffer, size_t size)
 {
-	unsigned char *buffer = (unsigned char*)mmap(NULL, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);;
-
-	if(buffer != NULL)
-	{
-		for(int i = 0; i < size; i += PAGE_SIZE)
-		{
-			buffer[i] = 0x90; //nop
-			buffer[i+1] = 0xc3; //ret
-		}
-	} else {
-		perror("Failed to allocate memory for eviction set");
-	}
+	int i, j, maxj;
+	fp ptr;
 	
-	return buffer;
-}
-
-int evict_itlb(unsigned char *buffer, size_t size)
-{
 	if(buffer == NULL)
 	{
 		return -1;
 	}
 	
 	// execute eviction set instructions
-	for(int i = 0; i < size; i += PAGE_SIZE)
+	for(i = 0; i < size; i += PAGE_SIZE)
 	{
-			fp ptr = (fp)(&(buffer[i]));
-			ptr();
+		maxj = i + PAGE_SIZE - 1;
+		
+		for(j = i; j < maxj; j++)
+		{
+			buffer[j] = 0x90;	
+		}
+		
+		buffer[maxj] = 0xc3;
+		ptr = (fp)(&(buffer[i]));
+		
+		ptr();
 	}
 	
 	return 0;
 }
 
-void profile_mem_access(volatile unsigned char* c, int* buffer, size_t cache_flush_set_size, unsigned char* ev_set, size_t ev_set_size, int touch, char* filename)
+void profile_mem_access(volatile unsigned char* c, int* buffer, size_t cache_flush_set_size, volatile unsigned char* ev_set, size_t ev_set_size, int touch, char* filename)
 {
 	int i, j, k;
 	unsigned long long hi1, lo1;
@@ -111,7 +105,7 @@ void profile_mem_access(volatile unsigned char* c, int* buffer, size_t cache_flu
 		c[1] = 0xc3; //ret
 	}
 
-	for(i = 0; i < 1000; i++)
+	for(i = 0; i < 100; i++)
 	{
 		if(evict_itlb(ev_set, ev_set_size) < 0)
 		{
@@ -208,10 +202,10 @@ int main(int argc, char* argv[])
 {
 	size_t target_size = 1UL << 40; // >1 TB
 	size_t cache_flush_set_size = 10 * 1024 * 1024; // 10MB
-	size_t ev_set_size = 1024 * PAGE_SIZE; // 1024 TLB entries 
+	size_t ev_set_size = 1024 * PAGE_SIZE; // 1024 TLB entries
 	int * cache_flush_set;
 	volatile unsigned char *target = (unsigned char*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	unsigned char *ev_set;
+	volatile unsigned char *ev_set;
 	
 	if(target == MAP_FAILED)
 	{
@@ -228,7 +222,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 	
-	ev_set = create_eviction_set(ev_set_size);
+	ev_set = (unsigned char*)mmap(NULL, ev_set_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	
 	if(ev_set == NULL)
 	{
