@@ -323,11 +323,7 @@ int main(int argc, char* argv[])
 	page_table_offset = (buffer_address >> 12) & page_table_offset_mask;
 	aux_phys_addr = get_physical_addr(fd, aux_phys_addr, page_table_offset);
 
-	// frame
-	printf("frame physical address: 0x%lx\n", aux_phys_addr);
-	page_table_offset = buffer_address & frame_offset_mask;
-	aux_phys_addr = get_physical_addr(fd, aux_phys_addr, page_table_offset);
-	printf("buffer physical address: 0x%lx\n", aux_phys_addr);
+	printf("buffer physical address: 0x%lx\n", aux_phys_addr | (buffer_address & frame_offset_mask));
 
 	// TODO store convenient instructions in 512(?) page offsets in buffer
 
