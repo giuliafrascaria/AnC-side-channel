@@ -11,11 +11,10 @@
 
 #define PAGE_SIZE 4096
 
-typedef void (*fp)(void);
+typedef void (*fp)();
 
 void nop()
 {
-	asm volatile("nop");
 	return;
 }
 
@@ -61,13 +60,13 @@ unsigned long get_physical_addr(int fd, unsigned long page_phys_addr, unsigned l
 	return ret;
 }
 
-fp* create_eviction_set(off_t size, int offset)
+fp* create_eviction_set(size_t size)
 {
-	fp *buffer = (fp *)mmap(NULL, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+	fp *buffer = (fp *)malloc(size);
 
 	if(buffer != NULL)
 	{
-		for(off_t i = offset; i < size; i += PAGE_SIZE)
+		for(int i = 0; i < size; i += PAGE_SIZE)
 		{
 			buffer[i] = nop;
 		}
@@ -78,7 +77,7 @@ fp* create_eviction_set(off_t size, int offset)
 	return buffer;
 }
 
-int evict_itlb(fp *buffer, off_t size, int offset)
+int evict_itlb(fp *buffer, size_t size)
 {
 	if(buffer == NULL)
 	{
@@ -86,25 +85,21 @@ int evict_itlb(fp *buffer, off_t size, int offset)
 	}
 	
 	// execute eviction set instructions
-	for(off_t j = offset; j < size; j += PAGE_SIZE)
+	for(int i = 0; i < size; i += PAGE_SIZE)
 	{
-		buffer[j]();
+		buffer[i]();
 	}
 	
 	return 0;
 }
 
-void profile_mem_access(volatile fp* c, int touch, char* filename)
+void profile_mem_access(volatile fp* c, int* buffer, size_t cache_flush_set_size, fp* ev_set, size_t ev_set_size, int touch, char* filename)
 {
-	int i,k;
+	int i, j, k;
 	unsigned long long hi1, lo1;
 	unsigned long long hi, lo;
 	uint64_t t, old, new;
-	off_t j, buf_size = 64 * 1024 * 1024, maxj = (64 * 1024 * 1024) / sizeof(int);
-	int* buffer;
-	fp* ev_set;
-	int offset = 0;
-	off_t ev_set_size = offset + 512 * PAGE_SIZE; // TODO figure out unified TLB size
+	int maxj = cache_flush_set_size / sizeof(int);
 	FILE *f = fopen(filename, "ab+");
 
 	if(f == NULL)
@@ -113,38 +108,17 @@ void profile_mem_access(volatile fp* c, int touch, char* filename)
 		return;
 	}
 	
-	buffer = (int*)malloc(buf_size);
-	
-	if(buffer == NULL)
-	{
-		perror("Failed to allocate buffer for flushing cache");
-		fclose(f);
-		return;
-	}
-	
-	ev_set = create_eviction_set(ev_set_size, offset);
-	
-	if(ev_set == NULL)
-	{
-		printf("Failed to create eviction set\n");
-		free(buffer);
-		fclose(f);
-		return;
-	}
-	
 	if(touch == 1)
 	{
-		c[offset] = nop;
+		c[0] = nop;
 	}
 
 	for(i = 0; i < 10; i++)
 	{
-		if(evict_itlb(ev_set, ev_set_size, offset) < 0)
+		if(evict_itlb(ev_set, ev_set_size) < 0)
 		{
 			printf("Failed to evict TLB\n");
-			free(buffer);
 			fclose(f);
-			munmap((void*)ev_set, ev_set_size);
 			return;
 		}
 		
@@ -156,7 +130,7 @@ void profile_mem_access(volatile fp* c, int touch, char* filename)
 
 		if(touch == 1)
 		{
-			c[offset]();
+			c[0]();
 		}
 
 		asm volatile ("mfence\n\t"
@@ -180,16 +154,12 @@ void profile_mem_access(volatile fp* c, int touch, char* filename)
 		if(fprintf(f, "%llu\n", (unsigned long long) t) < 0)
 		{
 			perror("Failed to print memory access");
-			free(buffer);
 			fclose(f);
-			munmap((void*)ev_set, ev_set_size);
 			return;
 		}
 	}
 
-	free(buffer);
 	fclose(f);
-	munmap((void*)ev_set, ev_set_size);
 }
 
 unsigned long get_phys_addr(volatile fp *buffer, off_t buffer_size)
@@ -238,12 +208,35 @@ unsigned long get_phys_addr(volatile fp *buffer, off_t buffer_size)
 
 int main(int argc, char* argv[])
 {
-	off_t buffer_size = 1UL << 40; // >1 TB
-	volatile fp *buffer = (fp*)mmap(NULL, (size_t) buffer_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	size_t target_size = 1UL << 40; // >1 TB
+	size_t cache_flush_set_size = 64 * 1024 * 1024; // 64 MB
+	size_t ev_set_size = 512 * PAGE_SIZE;
+	int * cache_flush_set;
+	volatile fp *target = (fp*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	fp *ev_set;
 	
-	if(buffer == MAP_FAILED)
+	if(target == MAP_FAILED)
 	{
 		perror("Failed to map memory.");
+		return -1;
+	}
+	
+	cache_flush_set = (int*)malloc(cache_flush_set_size);
+	
+	if(cache_flush_set == NULL)
+	{
+		perror("Failed to allocate memory for cache flush set");
+		munmap((void*) target, target_size);
+		return -1;
+	}
+	
+	ev_set = create_eviction_set(ev_set_size);
+	
+	if(ev_set == NULL)
+	{
+		perror("Failed to initialize TLB eviction set");
+		munmap((void*) target, target_size);
+		free(cache_flush_set);
 		return -1;
 	}
 	
@@ -251,8 +244,12 @@ int main(int argc, char* argv[])
 
 	// TODO store convenient instructions in 512(?) page offsets in buffer
 
-	profile_mem_access(buffer, 0, "uncached.txt");
-	profile_mem_access(buffer, 1, "hopefully_cached.txt");
+	profile_mem_access(target, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 0, "uncached.txt");
+	profile_mem_access(target, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 1, "hopefully_cached.txt");
+	
+	munmap((void*) target, target_size);
+	free(ev_set);
+	free(cache_flush_set);
 
 	//profiling(buffer, "cached.txt", "uncached.txt", 0);
 
