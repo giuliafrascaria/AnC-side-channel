@@ -107,7 +107,7 @@ volatile unsigned long* get_pointer_to_pte(Page page)
 	return ret;
 }
 
-void profile_mem_access(volatile unsigned char* c, volatile unsigned long* pte, unsigned long pt_offset, int* buffer, size_t cache_flush_set_size, volatile unsigned char* ev_set, size_t ev_set_size, int touch, char* filename)
+void profile_mem_access(volatile unsigned char** c, volatile unsigned long** pte, unsigned long pt_offset, int* buffer, size_t cache_flush_set_size, volatile unsigned char* ev_set, size_t ev_set_size, int touch, char* filename)
 {
 	int i, j, k;
 	unsigned long long hi1, lo1;
@@ -127,11 +127,11 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned long* pte, 
 	{
 		for(i = pt_offset; i < pt_offset + CACHE_LINE_SIZE - 1; i++)
 		{
-			c[i] = 0x90; //nop
+			(*c)[i] = 0x90; //nop
 		}
 		
-		c[i] = 0xc3; //ret
-		ptr = (fp)&(c[pt_offset]);
+		(*c)[i] = 0xc3; //ret
+		ptr = (fp)&((*c)[pt_offset]);
 	}
 
 	for(i = 0; i < 100; i++)
@@ -159,7 +159,7 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned long* pte, 
 							"mov %%rdx, %0\n\t"
 							"mov %%rax, %1\n\t" : "=r"(hi1), "=r"(lo1) : : "%rax", "%rbx", "%rcx", "%rdx");
 
-		asm volatile("movq (%0), %%rax\n" : : "c"(pte) : "rax");
+		asm volatile("movq (%0), %%rax\n" : : "c"(*pte) : "rax");
 
 		asm volatile ("RDTSCP\n\t"
 							"mov %%rdx, %0\n\t"
@@ -300,8 +300,8 @@ int main(int argc, char* argv[])
 
 	pte = page_ptr + pages[2].offset;
 
-	profile_mem_access(target, pte, pages[2].offset, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 0, "uncached.txt");
-	profile_mem_access(target, pte, pages[2].offset, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 1, "hopefully_cached.txt");
+	profile_mem_access(&target, &pte, pages[2].offset, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 0, "uncached.txt");
+	profile_mem_access(&target, &pte, pages[2].offset, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 1, "hopefully_cached.txt");
 	
 	free((void*)pte);
 	munmap((void*)page_ptr, PAGE_SIZE);
