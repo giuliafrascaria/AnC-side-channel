@@ -182,21 +182,12 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned long* pte, 
 	fclose(f);
 }
 
-Page* get_phys_addr(volatile unsigned char *buffer, off_t buffer_size)
+Page* get_phys_addr(unsigned long buffer_address)
 {
-	unsigned long buffer_address;
 	unsigned long page_table_offset_mask = 0x1ff; // last 9 bits
 	unsigned long frame_offset_mask = 0xfff; // last 12 bits
 	Page* physical_addresses;
 	int fd;
-
-	if(buffer == NULL)
-	{
-		printf("Cannot get physical address of null pointer\n");
-		return NULL;
-	}
-
-	buffer_address = (unsigned long) &buffer;
 
 	// array containing 4 physical addresses of PT pages and the translated VA
 	physical_addresses = (Page*)malloc(5 * sizeof(Page));
@@ -286,7 +277,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	pages = get_phys_addr(target, target_size);
+	pages = get_phys_addr((unsigned long) &target);
 
 	if(pages == NULL)
 	{
