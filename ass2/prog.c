@@ -10,6 +10,7 @@
 #include<string.h>
 
 #define PAGE_SIZE 4096
+#define CACHE_LINE_SIZE 64
 
 typedef void (*fp)(void);
 
@@ -61,20 +62,20 @@ unsigned long get_physical_addr(int fd, unsigned long page_phys_addr, unsigned l
 	return ret;
 }
 
-int evict_itlb(volatile unsigned char *buffer, size_t size)
+int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned long offset)
 {
 	int i, j, maxj;
 	fp ptr;
-	
+
 	if(buffer == NULL)
 	{
 		return -1;
 	}
 	
 	// execute eviction set instructions
-	for(i = 0; i < size; i += PAGE_SIZE)
+	for(i = offset; i < size; i += PAGE_SIZE)
 	{
-		maxj = i + PAGE_SIZE - 1;
+		maxj = i + CACHE_LINE_SIZE - 1;
 		
 		for(j = i; j < maxj; j++)
 		{
@@ -83,7 +84,7 @@ int evict_itlb(volatile unsigned char *buffer, size_t size)
 		
 		buffer[maxj] = 0xc3;
 		ptr = (fp)(&(buffer[i]));
-		
+
 		ptr();
 	}
 	
@@ -106,7 +107,7 @@ volatile unsigned long* get_pointer_to_pte(Page page)
 	return ret;
 }
 
-void profile_mem_access(volatile unsigned char* c, volatile unsigned long* pte, int* buffer, size_t cache_flush_set_size, volatile unsigned char* ev_set, size_t ev_set_size, int touch, char* filename)
+void profile_mem_access(volatile unsigned char* c, volatile unsigned long* pte, unsigned long pt_offset, int* buffer, size_t cache_flush_set_size, volatile unsigned char* ev_set, size_t ev_set_size, int touch, char* filename)
 {
 	int i, j, k;
 	unsigned long long hi1, lo1;
@@ -124,14 +125,18 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned long* pte, 
 	
 	if(touch == 1)
 	{
-		c[0] = 0x90; //nop
-		c[1] = 0xc3; //ret
-		ptr = (fp)&(c[0]);
+		for(i = pt_offset; i < pt_offset + CACHE_LINE_SIZE - 1; i++)
+		{
+			c[i] = 0x90; //nop
+		}
+		
+		c[i] = 0xc3; //ret
+		ptr = (fp)&(c[pt_offset]);
 	}
 
 	for(i = 0; i < 100; i++)
 	{
-		if(evict_itlb(ev_set, ev_set_size) < 0)
+		if(evict_itlb(ev_set, ev_set_size, pt_offset) < 0)
 		{
 			printf("Failed to evict TLB\n");
 			fclose(f);
@@ -304,8 +309,8 @@ int main(int argc, char* argv[])
 	
 	pte = page_ptr + pages[2].offset;
 
-	profile_mem_access(target, pte, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 0, "uncached.txt");
-	profile_mem_access(target, pte, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 1, "hopefully_cached.txt");
+	profile_mem_access(target, pte, pages[2].offset, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 0, "uncached.txt");
+	profile_mem_access(target, pte, pages[2].offset, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 1, "hopefully_cached.txt");
 	
 	free((void*)pte);
 	munmap((void*)page_ptr, PAGE_SIZE);
