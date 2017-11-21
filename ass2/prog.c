@@ -55,7 +55,7 @@ unsigned long get_physical_addr(int fd, unsigned long page_phys_addr, unsigned l
 		return 0;
 	}
 
-	ret = page[offset] & 0xfffffffffffff000; // discard lowest 12 bits
+	ret = page[offset / 8] & 0xfffffffffffff000; // discard lowest 12 bits
 
 	munmap((void*) page, PAGE_SIZE);
 
@@ -91,9 +91,9 @@ int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned long offset
 	return 0;
 }
 
-volatile unsigned char* get_pointer_to_pte(Page page)
+volatile unsigned long* get_pointer_to_pte(Page page)
 {
-	volatile unsigned char* ret;
+	volatile unsigned long* ret;
 	int fd = open("/dev/mem", O_RDONLY);
 
 	if(fd < 0)
@@ -102,12 +102,12 @@ volatile unsigned char* get_pointer_to_pte(Page page)
 		return NULL;
 	}
 
-	ret = (unsigned char*) mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, page.address);
+	ret = (unsigned long*) mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, page.address);
 
 	return ret;
 }
 
-void profile_mem_access(volatile unsigned char** c, volatile unsigned char** pte, unsigned long pt_offset, int* buffer, size_t cache_flush_set_size, volatile unsigned char* ev_set, size_t ev_set_size, int touch, char* filename)
+void profile_mem_access(volatile unsigned char** c, volatile unsigned long** pte, unsigned long pt_offset, int* buffer, size_t cache_flush_set_size, volatile unsigned char* ev_set, size_t ev_set_size, int touch, char* filename)
 {
 	int i, j, k;
 	unsigned long long hi1, lo1;
@@ -248,8 +248,8 @@ int main(int argc, char* argv[])
 	int * cache_flush_set;
 	volatile unsigned char *ev_set;
 	Page* pages;
-	volatile unsigned char* page_ptr;
-	volatile unsigned char* pte;
+	volatile unsigned long* page_ptr;
+	volatile unsigned long* pte;
 	volatile unsigned char *target = (unsigned char*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 	if(target == MAP_FAILED)
@@ -298,7 +298,7 @@ int main(int argc, char* argv[])
 		free(pages);
 	}
 
-	pte = page_ptr + pages[2].offset;
+	pte = page_ptr + (pages[2].offset / 8);
 
 	profile_mem_access(&target, &pte, pages[2].offset, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 0, "uncached.txt");
 	profile_mem_access(&target, &pte, pages[2].offset, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 1, "hopefully_cached.txt");
