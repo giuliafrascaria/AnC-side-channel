@@ -62,7 +62,7 @@ unsigned long get_physical_addr(int fd, unsigned long page_phys_addr, unsigned l
 	return ret;
 }
 
-int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned long offset)
+int evict_itlb(volatile unsigned char *buffer, size_t size)
 {
 	int i, j, maxj;
 	fp ptr;
@@ -73,7 +73,7 @@ int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned long offset
 	}
 
 	// execute eviction set instructions
-	for(i = offset; i < size; i += PAGE_SIZE)
+	for(i = 0; i < size; i += PAGE_SIZE)
 	{
 		maxj = i + CACHE_LINE_SIZE - 1;
 
@@ -127,18 +127,18 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned long** pte
 
 	if(touch == 1)
 	{
-		for(i = pt_offset; i < pt_offset + CACHE_LINE_SIZE - 1; i++)
+		for(i = 0; i < CACHE_LINE_SIZE - 1; i++)
 		{
 			(*c)[i] = 0x90; //nop
 		}
 		
 		(*c)[i] = 0xc3; //ret
-		ptr = (fp)&((*c)[pt_offset]);
+		ptr = (fp)&((*c)[0]);
 	}
 
 	for(i = 0; i < 100; i++)
 	{
-		if(evict_itlb(ev_set, ev_set_size, pt_offset) < 0)
+		if(evict_itlb(ev_set, ev_set_size) < 0)
 		{
 			printf("Failed to evict TLB\n");
 			fclose(f);
