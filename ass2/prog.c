@@ -16,14 +16,14 @@ typedef void (*fp)(void);
 
 typedef struct
 {
-	unsigned long address;
-	unsigned long offset;
+	uint64_t address;
+	uint64_t offset;
 } Page;
 
 // returns the CR3 register value (physical address of PGD)
-unsigned long get_page_table_root()
+uint64_t get_page_table_root()
 {
-	unsigned long val;
+	uint64_t val;
 
 	FILE* f = fopen("/proc/cr3", "rb");
 
@@ -43,12 +43,12 @@ unsigned long get_page_table_root()
 	return val;
 }
 
-unsigned long get_physical_addr(int fd, unsigned long page_phys_addr, unsigned long offset)
+uint64_t get_physical_addr(int fd, uint64_t page_phys_addr, uint64_t offset)
 {
-	unsigned long ret;
-	unsigned long *page;
+	uint64_t ret;
+	uint64_t *page;
 
-	page = (unsigned long*) mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, page_phys_addr);
+	page = (uint64_t*) mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, page_phys_addr);
 
 	if(page == NULL)
 	{
@@ -91,9 +91,9 @@ int evict_itlb(volatile unsigned char *buffer, size_t size)
 	return 0;
 }
 
-volatile unsigned long* get_pointer_to_pte(Page page)
+volatile uint64_t* get_pointer_to_pte(Page page)
 {
-	volatile unsigned long* ret;
+	volatile uint64_t* ret;
 	int fd = open("/dev/mem", O_RDONLY);
 
 	if(fd < 0)
@@ -102,12 +102,12 @@ volatile unsigned long* get_pointer_to_pte(Page page)
 		return NULL;
 	}
 
-	ret = (unsigned long*) mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, page.address);
+	ret = (uint64_t*) mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, page.address);
 
 	return ret;
 }
 
-void profile_mem_access(volatile unsigned char** c, volatile unsigned long** pte, unsigned long pt_offset, int* buffer, size_t cache_flush_set_size, volatile unsigned char* ev_set, size_t ev_set_size, int touch, char* filename)
+void profile_mem_access(volatile unsigned char** c, volatile uint64_t** pte, uint64_t pt_offset, int* buffer, size_t cache_flush_set_size, volatile unsigned char* ev_set, size_t ev_set_size, int touch, char* filename)
 {
 	int i, j, k;
 	unsigned long long hi1, lo1;
@@ -184,10 +184,10 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned long** pte
 	fclose(f);
 }
 
-Page* get_phys_addr(unsigned long buffer_address)
+Page* get_phys_addr(uint64_t buffer_address)
 {
-	unsigned long page_table_offset_mask = 0x1ff; // last 9 bits
-	unsigned long frame_offset_mask = 0xfff; // last 12 bits
+	uint64_t page_table_offset_mask = 0x1ff; // last 9 bits
+	uint64_t frame_offset_mask = 0xfff; // last 12 bits
 	Page* physical_addresses;
 	int fd;
 
@@ -250,8 +250,8 @@ int main(int argc, char* argv[])
 	int * cache_flush_set;
 	volatile unsigned char *ev_set;
 	Page* pages;
-	volatile unsigned long* page_ptr;
-	volatile unsigned long* pte;
+	volatile uint64_t* page_ptr;
+	volatile uint64_t* pte;
 	volatile unsigned char *target = (unsigned char*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 	if(target == MAP_FAILED)
@@ -279,7 +279,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	pages = get_phys_addr((unsigned long) &target);
+	pages = get_phys_addr((uint64_t) &target);
 
 	if(pages == NULL)
 	{
