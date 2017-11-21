@@ -75,7 +75,7 @@ int evict_itlb(volatile unsigned char *buffer, size_t size)
 	// execute eviction set instructions
 	for(i = 0; i < size; i += PAGE_SIZE)
 	{
-		maxj = i + CACHE_LINE_SIZE - 1;
+		maxj = i + CACHE_LINE_SIZE - 2;
 
 		for(j = i; j < maxj; j++)
 		{
@@ -83,6 +83,7 @@ int evict_itlb(volatile unsigned char *buffer, size_t size)
 		}
 
 		buffer[maxj] = 0xc3;
+		buffer[maxj + 1] = 0x00;
 		ptr = (fp)(&(buffer[i]));
 
 		ptr();
@@ -127,12 +128,13 @@ void profile_mem_access(volatile unsigned char** c, volatile uint64_t** pte, uin
 
 	if(touch == 1)
 	{
-		for(i = 0; i < CACHE_LINE_SIZE - 1; i++)
+		for(i = 0; i < CACHE_LINE_SIZE - 2; i++)
 		{
 			(*c)[i] = 0x90; //nop
 		}
 		
 		(*c)[i] = 0xc3; //ret
+		(*c)[i+1] = 0x00;
 		ptr = (fp)&((*c)[0]);
 	}
 
