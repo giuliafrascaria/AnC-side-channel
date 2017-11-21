@@ -55,7 +55,7 @@ unsigned long get_physical_addr(int fd, unsigned long page_phys_addr, unsigned l
 		return 0;
 	}
 
-	ret = page[offset / 8] & 0xfffffffffffff000; // discard lowest 12 bits
+	ret = page[offset] & 0xfffffffffffff000; // discard lowest 12 bits
 
 	munmap((void*) page, PAGE_SIZE);
 
@@ -116,6 +116,8 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned long** pte
 	int maxj = cache_flush_set_size / sizeof(int);
 	fp ptr; // pointer to function stored in the target buffer
 	FILE *f = fopen(filename, "ab+");
+
+	pt_offset *= 8; // express offset in bytes, not PTEs
 
 	if(f == NULL)
 	{
@@ -298,7 +300,7 @@ int main(int argc, char* argv[])
 		free(pages);
 	}
 
-	pte = page_ptr + (pages[2].offset / 8);
+	pte = page_ptr + pages[2].offset;
 
 	profile_mem_access(&target, &pte, pages[2].offset, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 0, "uncached.txt");
 	profile_mem_access(&target, &pte, pages[2].offset, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 1, "hopefully_cached.txt");
