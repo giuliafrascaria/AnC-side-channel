@@ -55,14 +55,14 @@ unsigned long get_physical_addr(int fd, unsigned long page_phys_addr, unsigned l
 		return 0;
 	}
 
-	ret = page[offset] & 0x7ffffffffffff & 0xfffffffffffff000;
+	ret = page[offset] & 0xffffffffff000; // keep bits 12-51
 
 	munmap((void*) page, PAGE_SIZE);
 
 	return ret;
 }
 
-int evict_itlb(volatile unsigned char *buffer, size_t size)
+int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned long offset)
 {
 	int i, j, maxj;
 	fp ptr;
@@ -73,7 +73,7 @@ int evict_itlb(volatile unsigned char *buffer, size_t size)
 	}
 
 	// execute eviction set instructions
-	for(i = 0; i < size; i += PAGE_SIZE)
+	for(i = offset; i < size; i += PAGE_SIZE)
 	{
 		maxj = i + CACHE_LINE_SIZE - 1;
 
@@ -91,58 +91,54 @@ int evict_itlb(volatile unsigned char *buffer, size_t size)
 	return 0;
 }
 
-void profile_mem_access(volatile unsigned char** c, Page ptp, int* buffer, size_t cache_flush_set_size, volatile unsigned char* ev_set, size_t ev_set_size, int touch, char* filename)
+volatile unsigned long* get_pointer_to_pte(Page page)
 {
-	int i, j, k, fd;
+	volatile unsigned long* ret;
+	int fd = open("/dev/mem", O_RDONLY);
+
+	if(fd < 0)
+	{
+		perror("Failed to open /dev/mem");
+		return NULL;
+	}
+
+	ret = (unsigned long*) mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, page.address);
+
+	return ret;
+}
+
+void profile_mem_access(volatile unsigned char** c, volatile unsigned long** pte, unsigned long pt_offset, int* buffer, size_t cache_flush_set_size, volatile unsigned char* ev_set, size_t ev_set_size, int touch, char* filename)
+{
+	int i, j, k;
 	unsigned long long hi1, lo1;
 	unsigned long long hi, lo;
 	uint64_t t, old, new;
 	int maxj = cache_flush_set_size / sizeof(int);
-	unsigned long* pt, *pte;
 	fp ptr; // pointer to function stored in the target buffer
 	FILE *f = fopen(filename, "ab+");
-	
+
+	pt_offset *= 8; // express offset in bytes, not PTEs
+
 	if(f == NULL)
 	{
 		perror("Failed to open file for printing memory access profiles");
 		return;
 	}
-	
-	fd = open("/dev/mem", O_RDONLY);
-
-	if(fd < 0)
-	{
-		perror("Failed to open /dev/mem");
-		fclose(f);
-		return;
-	}
-
-	pt = (unsigned long*) mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, ptp.address);
-	
-	if(pt == NULL)
-	{
-		perror("Failed to map page table page");
-		fclose(f);
-		close(fd);
-		return;
-	}
-	
-	pte = pt + ptp.offset;
 
 	if(touch == 1)
 	{
-		for(i = 0; i < CACHE_LINE_SIZE - 1; i++)
+		for(i = pt_offset; i < pt_offset + CACHE_LINE_SIZE - 1; i++)
 		{
 			(*c)[i] = 0x90; //nop
 		}
 		
 		(*c)[i] = 0xc3; //ret
-		ptr = (fp)&(*c);
+		ptr = (fp)&((*c)[pt_offset]);
 	}
 
 	for(i = 0; i < 100; i++)
 	{
-		if(evict_itlb(ev_set, ev_set_size) < 0)
+		if(evict_itlb(ev_set, ev_set_size, pt_offset) < 0)
 		{
 			printf("Failed to evict TLB\n");
 			fclose(f);
@@ -165,7 +161,7 @@ void profile_mem_access(volatile unsigned char** c, Page ptp, int* buffer, size_
 							"mov %%rdx, %0\n\t"
 							"mov %%rax, %1\n\t" : "=r"(hi1), "=r"(lo1) : : "%rax", "%rbx", "%rcx", "%rdx");
 
-		asm volatile("movq (%0), %%rax\n" : : "c"(pte) : "rax");
+		asm volatile("movq (%0), %%rax\n" : : "c"(*pte) : "rax");
 
 		asm volatile ("RDTSCP\n\t"
 							"mov %%rdx, %0\n\t"
@@ -180,16 +176,12 @@ void profile_mem_access(volatile unsigned char** c, Page ptp, int* buffer, size_
 		if(fprintf(f, "%llu\n", (unsigned long long) t) < 0)
 		{
 			perror("Failed to print memory access");
-			munmap((void*)pt, PAGE_SIZE);
 			fclose(f);
-			close(fd);
 			return;
 		}
 	}
-	
-	munmap((void*)pt, PAGE_SIZE);
+
 	fclose(f);
-	close(fd);
 }
 
 Page* get_phys_addr(unsigned long buffer_address)
@@ -258,6 +250,8 @@ int main(int argc, char* argv[])
 	int * cache_flush_set;
 	volatile unsigned char *ev_set;
 	Page* pages;
+	volatile unsigned long* page_ptr;
+	volatile unsigned long* pte;
 	volatile unsigned char *target = (unsigned char*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 	if(target == MAP_FAILED)
@@ -295,9 +289,24 @@ int main(int argc, char* argv[])
 		free(cache_flush_set);
 	}
 
-	profile_mem_access(&target, pages[2], cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 0, "uncached.txt");
-	profile_mem_access(&target, pages[2], cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 1, "hopefully_cached.txt");
+	page_ptr = get_pointer_to_pte(pages[2]); // using PTL2 to trigger side effect
+
+	if(page_ptr == NULL)
+	{
+		printf("Failed to map target page table page\n");
+		munmap((void*) target, target_size);
+		munmap((void*) ev_set, ev_set_size);
+		free(cache_flush_set);
+		free(pages);
+	}
+
+	pte = page_ptr + pages[2].offset;
+
+	profile_mem_access(&target, &pte, pages[2].offset, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 0, "uncached.txt");
+	profile_mem_access(&target, &pte, pages[2].offset, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 1, "hopefully_cached.txt");
 	
+	free((void*)pte);
+	munmap((void*)page_ptr, PAGE_SIZE);
 	munmap((void*) target, target_size);
 	munmap((void*) ev_set, ev_set_size);
 	free(cache_flush_set);
