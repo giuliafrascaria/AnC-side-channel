@@ -214,30 +214,34 @@ Page* get_phys_addr(uint64_t buffer_address)
 		return NULL;
 	}
 
-	printf("buffer virtual address: 0x%lx\n", buffer_address);
+	printf("Buffer virtual address: 0x%lx\n", buffer_address);
 
 	// level 4
 	printf("PT4 physical address: 0x%lx\n", physical_addresses[0].address);
 	physical_addresses[0].offset = (buffer_address >> 39) & page_table_offset_mask;
+	printf("Index in PT4: %lu\n", physical_addresses[0].offset);
 	physical_addresses[1].address = get_physical_addr(fd, physical_addresses[0].address, physical_addresses[0].offset);
 
 	// level 3
 	printf("PT3 physical address: 0x%lx\n", physical_addresses[1].address);
 	physical_addresses[1].offset = (buffer_address >> 30) & page_table_offset_mask;
+	printf("Index in PT3: %lu\n", physical_addresses[1].offset);
 	physical_addresses[2].address = get_physical_addr(fd, physical_addresses[1].address, physical_addresses[1].offset);
 
 	// level 2
 	printf("PT2 physical address: 0x%lx\n", physical_addresses[2].address);
 	physical_addresses[2].offset = (buffer_address >> 21) & page_table_offset_mask;
+	printf("Index in PT2: %lu\n", physical_addresses[2].offset);
 	physical_addresses[3].address = get_physical_addr(fd, physical_addresses[2].address, physical_addresses[2].offset);
 
 	// level 1
 	printf("PT1 physical address: 0x%lx\n", physical_addresses[3].address);
 	physical_addresses[3].offset = (buffer_address >> 12) & page_table_offset_mask;
+	printf("Index in PT1: %lu\n", physical_addresses[3].offset);
 	physical_addresses[4].address = get_physical_addr(fd, physical_addresses[3].address, physical_addresses[3].offset);
 
 	physical_addresses[4].offset = buffer_address & frame_offset_mask;
-	printf("buffer physical address: 0x%lx\n", physical_addresses[4].address | physical_addresses[4].offset);
+	printf("Buffer physical address: 0x%lx\n", physical_addresses[4].address | physical_addresses[4].offset);
 
 	return physical_addresses;
 }
@@ -305,12 +309,12 @@ int main(int argc, char* argv[])
 	profile_mem_access(&target, &pte, pages[2].offset, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 0, "uncached.txt");
 	profile_mem_access(&target, &pte, pages[2].offset, cache_flush_set, cache_flush_set_size, ev_set, ev_set_size, 1, "hopefully_cached.txt");
 	
-	free((void*)pte);
-	munmap((void*)page_ptr, PAGE_SIZE);
-	munmap((void*) target, target_size);
-	munmap((void*) ev_set, ev_set_size);
-	free(cache_flush_set);
-	free(pages);
+	// free((void*)pte);
+	// munmap((void*)page_ptr, PAGE_SIZE);
+	// munmap((void*) target, target_size);
+	// munmap((void*) ev_set, ev_set_size);
+	// free(cache_flush_set);
+	// free(pages);
 
 	return 0;
 }
