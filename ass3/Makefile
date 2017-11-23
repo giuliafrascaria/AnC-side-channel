@@ -9,5 +9,4 @@ prog: prog.o
 clean:
 	rm -rf prog.o
 	rm -rf prog
-	rm hopefully_cached.txt
 	rm uncached.txt
