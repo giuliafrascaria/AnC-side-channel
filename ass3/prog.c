@@ -122,10 +122,10 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 void scan_target(volatile unsigned char** c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename)
 {
 		//move 1 page at a time, for now 10 pages should be enough
-		for(int i = 0; i < 10; i++)
+		for(int i = 0; i < 64; i++)
 		{
 			printf("new page\n");
-			profile_mem_access(c, ev_set, ev_set_size, filename, i*PAGE_SIZE);
+			profile_mem_access(c, ev_set, ev_set_size, filename, i*8*PAGE_SIZE);
 		}
 }
 
