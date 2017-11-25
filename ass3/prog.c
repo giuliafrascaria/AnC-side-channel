@@ -28,8 +28,8 @@ int evict_itlb(volatile unsigned char *buffer, size_t size, int offset)
 
 	// execute eviction set instructions
 	for(i = 0; i < size; i += PAGE_SIZE)
-	{	
-	
+	{
+
 		buffer[i + offset] = 0xc3;
 		ptr = (fp)(&(buffer[i + offset]));
 
@@ -39,7 +39,7 @@ int evict_itlb(volatile unsigned char *buffer, size_t size, int offset)
 	return 0;
 }
 
-void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename)
+void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename, int offset)
 {
 	int i, j, k;
 	unsigned long long hi1, lo1;
@@ -54,16 +54,20 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 		perror("Failed to open file for printing memory access profiles");
 		return;
 	}
-	
-	(*c)[0] = 0xc3;
-	ptr = (fp)&((*c)[0]);
+
+	//we chose the target instruction at offset 0 within a page
+	(*c)[offset] = 0xc3;
+	ptr = (fp)&((*c)[offset]);
 
 
-	for(j = 0; j < 15; j++)
-	{	
+	for(j = 0; j < 1; j++)
+	{
 		for(i = 0; i < NUMBER_OF_CACHE_OFFSETS; i++){
 
 			//evict the i-th cacheline for each page in the eviction set
+			//evict cache line i
+
+			//evict tlb
 			if(evict_itlb(ev_set, ev_set_size, i + NUMBER_OF_CACHE_OFFSETS) < 0)
 			{
 				printf("Failed to evict TLB\n");
@@ -74,7 +78,7 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 			// //target address with different offset than the one from which we evicted
 			// (*c)[((i + 1) % NUMBER_OF_CACHE_OFFSETS) * NUMBER_OF_CACHE_OFFSETS] = 0xc3;
 			// ptr = (fp)&((*c)[((i + 1) % NUMBER_OF_CACHE_OFFSETS) * NUMBER_OF_CACHE_OFFSETS]);
-			
+
 
 			asm volatile ("mfence\n\t"
 								"CPUID\n\t"
@@ -106,10 +110,21 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 
 		}
 
-	
+
 	}
 
 	fclose(f);
+}
+
+
+void scan_target(volatile unsigned char** c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename)
+{
+		//move 1 page at a time, for now 10 pages should be enough
+		for(int i = 0; i < 10; i++)
+		{
+			printf("new page\n");
+			profile_mem_access(c, ev_set, ev_set_size, filename, i*PAGE_SIZE);
+		}
 }
 
 
@@ -121,7 +136,7 @@ int main(int argc, char* argv[])
 	volatile unsigned char *target = (unsigned char*)mmap(NULL, ev_set_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	target[0] = "F";
 	target[1] = "U";
-	
+
 	if(target == MAP_FAILED)
 	{
 		perror("Failed to map memory.");
@@ -138,9 +153,11 @@ int main(int argc, char* argv[])
 	}
 
 
-	profile_mem_access(&target, ev_set, ev_set_size, "uncached.txt");
+	profile_mem_access(&target, ev_set, ev_set_size, "uncached.txt", 0);
 	//profile_mem_access(&target, ev_set, ev_set_size, "hopefully_cached.txt");
-	
+
+	scan_target(&target, ev_set, ev_set_size, "scan.txt");
+
 	// free((void*)pte);
 	// munmap((void*)page_ptr, PAGE_SIZE);
 	// munmap((void*) target, target_size);
