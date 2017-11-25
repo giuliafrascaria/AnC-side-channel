@@ -68,7 +68,7 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 			//evict cache line i
 
 			//evict tlb
-			if(i >= 0 && evict_itlb(ev_set, ev_set_size, i + NUMBER_OF_CACHE_OFFSETS) < 0)
+			if(i >= 0 && evict_itlb(ev_set, ev_set_size, i * NUMBER_OF_CACHE_OFFSETS) < 0)
 			{
 				printf("Failed to evict TLB\n");
 				fclose(f);
@@ -129,17 +129,17 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 void scan_target(volatile unsigned char** c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename)
 {
 		//move 1 page at a time, for now 10 pages should be enough
-		for(int i = 0; i < 64; i++)
+		for(int i = 0; i < 128; i++)
 		{
 			printf("new page\n");
-			profile_mem_access(c, ev_set, ev_set_size, filename, i*8*PAGE_SIZE);
+			profile_mem_access(c, ev_set, ev_set_size, filename, i*1*PAGE_SIZE);
 		}
 }
 
 
 int main(int argc, char* argv[])
 {
-	size_t ev_set_size = 32768 * PAGE_SIZE; // 8192 TLB entries
+	size_t ev_set_size = 8192 * PAGE_SIZE; // 8192 TLB entries
 	volatile unsigned char *ev_set;
 
 	volatile unsigned char *target = (unsigned char*)mmap(NULL, ev_set_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
