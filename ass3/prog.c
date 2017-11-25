@@ -112,7 +112,7 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 		
 		ret /= 5;
 		
-		if(i >= 0 && fprintf(f, "%lu\n", (unsigned long long) ret) < 0)
+		if(i >= 0 && fprintf(f, "%lu\n", abs((unsigned long long) ret - base)) < 0)
 		{
 			perror("Failed to print memory access");
 			fclose(f);
