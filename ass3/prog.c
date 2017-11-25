@@ -68,7 +68,7 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 			//evict cache line i
 
 			//evict tlb
-			if(i >= 0 && evict_itlb(ev_set, ev_set_size, i * NUMBER_OF_CACHE_OFFSETS) < 0)
+			if(i >= 0 && evict_itlb(ev_set, ev_set_size, (i + 4) * NUMBER_OF_CACHE_OFFSETS) < 0)
 			{
 				printf("Failed to evict TLB\n");
 				fclose(f);
@@ -132,7 +132,7 @@ void scan_target(volatile unsigned char** c, volatile unsigned char* ev_set, siz
 		for(int i = 0; i < 128; i++)
 		{
 			printf("new page\n");
-			profile_mem_access(c, ev_set, ev_set_size, filename, i*1*PAGE_SIZE);
+			profile_mem_access(c, ev_set, ev_set_size, filename, i * PAGE_SIZE);
 		}
 }
 
