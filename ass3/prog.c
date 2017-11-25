@@ -44,7 +44,8 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 	int i, j, k;
 	unsigned long long hi1, lo1;
 	unsigned long long hi, lo;
-	uint64_t t, old, new, base;
+	uint64_t old, new, base;
+	uint64_t t[5];
 	fp ptr; // pointer to function stored in the target buffer
 	FILE *f = fopen(filename, "ab+");
 
@@ -60,11 +61,10 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 	ptr = (fp)&((*c)[offset]);
 
 
-	for(j = 0; j < 1; j++)
-	{
-		for(i = -1; i < NUMBER_OF_CACHE_OFFSETS; i++){
+	for(i = -1; i < NUMBER_OF_CACHE_OFFSETS; i++){
+		for(j = 0; j < 5; j++){
 
-			//evict the i-th cacheline for each page in the eviction set
+			//evict the i-th cacheline for each; page in the eviction set
 			//evict cache line i
 
 			//evict tlb
@@ -73,6 +73,8 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 				printf("Failed to evict TLB\n");
 				fclose(f);
 				return;
+			} else if (i < 0) {
+				ptr();
 			}
 
 			// //target address with different offset than the one from which we evicted
@@ -99,20 +101,25 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 
 			old = (uint64_t) (hi1 << 32) | lo1;
 			new = (uint64_t) (hi << 32) | lo;
-			t = new - old;
-
-			if(i >= 0 && fprintf(f, "%llu\n", abs(t - base)) < 0)
-			{
-				perror("Failed to print memory access");
-				fclose(f);
-				return;
-			} else {
-				base = t;
-			}
-
+			t[j] = new - old;
 		}
 
-
+		uint64_t ret = 0;
+		
+		for(j = 0; j<5; j++){
+			ret += t[j];		
+		}
+		
+		ret /= 5;
+		
+		if(i >= 0 && fprintf(f, "%lu\n", (unsigned long long) ret) < 0)
+		{
+			perror("Failed to print memory access");
+			fclose(f);
+			return;
+		} else if (i < 0) {
+			base = ret;
+		}
 	}
 
 	fclose(f);
