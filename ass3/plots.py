@@ -6,6 +6,7 @@ import numpy as np
 
 cached_filepath = "./uncached.txt"
 uncached_filepath = "./uncached.txt"
+scan_filepath = "./scan.txt"
 fig_filepath = "plots.png"
 heat_filepath = "heatmap.png"
 
@@ -22,6 +23,7 @@ def main():
 	#	return
 
 	cached_values = [int(line) for line in open(cached_filepath)]
+	scan_values = [int(line) for line in open(scan_filepath)]
 	#uncached_values = [int(line) for line in open(uncached_filepath)]
 
 	fig = plt.figure()
@@ -32,19 +34,20 @@ def main():
 
 
 
-	plt.hist(cached_values, color='blue', bins=200)
+	# plt.hist(cached_values, color='blue', bins=200)
+	#
+	#
+	# fig.text(0.5, 0.01, 'Clock ticks', ha='center')
+	# fig.text(0.03, 0.5, 'Experiment number', va='center', rotation='vertical')
+	#
+	# if os.path.exists(fig_filepath):
+	# 	os.remove(fig_filepath)
+	#
+	# fig.savefig(fig_filepath)
 
 
-	fig.text(0.5, 0.01, 'Clock ticks', ha='center')
-	fig.text(0.03, 0.5, 'Experiment number', va='center', rotation='vertical')
-
-	if os.path.exists(fig_filepath):
-		os.remove(fig_filepath)
-
-	fig.savefig(fig_filepath)
-
-
-	a = np.random.random((8, 64))
+	#a = np.random.random((8, 64))
+	a = np.reshape(scan_values, (-1, 64))
 	plt.imshow(a, cmap='hot', interpolation='nearest')
 	plt.show()
 
