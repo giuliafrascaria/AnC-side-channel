@@ -44,7 +44,7 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 	int i, j, k;
 	unsigned long long hi1, lo1;
 	unsigned long long hi, lo;
-	uint64_t t, old, new;
+	uint64_t t, old, new, base;
 	fp ptr; // pointer to function stored in the target buffer
 	FILE *f = fopen(filename, "ab+");
 
@@ -62,13 +62,13 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 
 	for(j = 0; j < 1; j++)
 	{
-		for(i = 0; i < NUMBER_OF_CACHE_OFFSETS; i++){
+		for(i = -1; i < NUMBER_OF_CACHE_OFFSETS; i++){
 
 			//evict the i-th cacheline for each page in the eviction set
 			//evict cache line i
 
 			//evict tlb
-			if(evict_itlb(ev_set, ev_set_size, i + NUMBER_OF_CACHE_OFFSETS) < 0)
+			if(i >= 0 && evict_itlb(ev_set, ev_set_size, i + NUMBER_OF_CACHE_OFFSETS) < 0)
 			{
 				printf("Failed to evict TLB\n");
 				fclose(f);
@@ -101,11 +101,13 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 			new = (uint64_t) (hi << 32) | lo;
 			t = new - old;
 
-			if(fprintf(f, "%llu\n", (unsigned long long) t) < 0)
+			if(i >= 0 && fprintf(f, "%llu\n", abs(t - base)) < 0)
 			{
 				perror("Failed to print memory access");
 				fclose(f);
 				return;
+			} else {
+				base = t;
 			}
 
 		}
