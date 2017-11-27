@@ -10,7 +10,6 @@
 #include<string.h>
 #include<limits.h>
 
-#define PAGE_SIZE 4096
 #define CACHE_LINE_SIZE 64
 #define NUMBER_OF_CACHE_OFFSETS 64
 #define KB (2^10)
@@ -142,7 +141,7 @@ void scan_target(volatile unsigned char** c, volatile unsigned char* ev_set, siz
 
 int main(int argc, char* argv[])
 {
-	size_t ev_set_size = 8192 * PAGE_SIZE; // 8192 TLB entries just to be sure :)
+	size_t ev_set_size = 8192 * 4 * KB; // 8192 TLB entries just to be sure :)
 	size_t target_size = TB; // 1 TB target buffer
 	volatile unsigned char *ev_set;
 	volatile unsigned char *target = (unsigned char*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -164,8 +163,6 @@ int main(int argc, char* argv[])
 
 	scan_target(&target, ev_set, ev_set_size, 4 * KB, "scan.txt"); // measure for PTL1
 
-	// free((void*)pte);
-	// munmap((void*)page_ptr, PAGE_SIZE);
 	// munmap((void*) target, target_size);
 	// munmap((void*) ev_set, ev_set_size);
 	// free(cache_flush_set);
