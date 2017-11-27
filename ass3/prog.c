@@ -142,9 +142,10 @@ void scan_target(volatile unsigned char** c, volatile unsigned char* ev_set, siz
 
 int main(int argc, char* argv[])
 {
-	size_t ev_set_size = 8192 * PAGE_SIZE; // 8192 TLB entries
+	size_t ev_set_size = 8192 * PAGE_SIZE; // 8192 TLB entries just to be sure :)
+	size_t target_size = TB; // 1 TB target buffer
 	volatile unsigned char *ev_set;
-	volatile unsigned char *target = (unsigned char*)mmap(NULL, ev_set_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	volatile unsigned char *target = (unsigned char*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 	if(target == MAP_FAILED)
 	{
