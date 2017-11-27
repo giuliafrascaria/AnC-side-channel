@@ -10,4 +10,3 @@ clean:
 	rm -rf prog.o
 	rm -rf prog
 	rm scan.txt
-	rm uncached.txt

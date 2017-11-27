@@ -9,8 +9,8 @@ heat_filepath = "heatmap.png"
 
 def main():
 
-	if not os.path.exists(cached_filepath):
-		print("%s not found" % cached_filepath)
+	if not os.path.exists(scan_filepath):
+		print("%s not found" % scan_filepath)
 		return
 	
 	scan_values = [int(line) for line in open(scan_filepath)]
