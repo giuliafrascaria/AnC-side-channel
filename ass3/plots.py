@@ -18,6 +18,7 @@ def main():
 	fig = plt.figure()
 	a = np.reshape(scan_values, (-1, 64))
 	plt.imshow(a, cmap='hot', interpolation='nearest')
+	plt.colorbar()
 	plt.show()
 
 	if os.path.exists(heat_filepath):
