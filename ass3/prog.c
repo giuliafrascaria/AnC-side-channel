@@ -16,6 +16,8 @@
 #define MB (1 << 20)
 #define GB (1 << 30)
 #define TB (1L << 40)
+#define CACHE_SIZE (1L << 24)
+#define NUM_CACHE_ENTRIES 512
 
 typedef void (*fp)(void);
 
@@ -44,13 +46,45 @@ int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned short int c
 		buffer[i] = 0xc3;
 	}
 
+	// flush cache
 	for(i = cache_line_offset; i < size; i += page_size)
 	{
-
 		ptr = (fp)(&(buffer[i]));
 
 		ptr();
 	}
+	
+	// flush PTL1 from TLB
+	for(i = 0; i < NUM_CACHE_ENTRIES; i++)
+	{
+		ptr = (fp)(&(buffer[i * 4 * KB + cache_line_offset]));
+
+		ptr();	
+	}
+	
+	// flush PTL2 from TLB
+	for(i = 0; i < NUM_CACHE_ENTRIES; i++)
+	{
+		ptr = (fp)(&(buffer[i * 2 * MB + cache_line_offset]));
+
+		ptr();	
+	}
+	
+	// flush PTL3 from TLB
+	/*for(i = 0; i < NUM_CACHE_ENTRIES; i++)
+	{
+		ptr = (fp)(&(buffer[i * 1 * GB + cache_line_offset]));
+
+		ptr();	
+	}
+	
+	// flush PTL4 from TLB
+	for(i = 0; i < NUM_CACHE_ENTRIES; i++)
+	{
+		ptr = (fp)(&(buffer[i * 512 * GB + cache_line_offset]));
+
+		ptr();	
+	}*/
 
 	return 0;
 }
@@ -135,7 +169,7 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 void scan_target(volatile unsigned char** c, volatile unsigned char* ev_set, size_t ev_set_size, uint64_t page_size, char* filename)
 {
 		//move 1 page at a time, for now 10 pages should be enough
-		for(int i = 0; i < 128; i++)
+		for(int i = 0; i < 10; i++)
 		{
 			profile_mem_access(c, ev_set, ev_set_size, filename, 8 * i, page_size);
 		}
@@ -144,7 +178,7 @@ void scan_target(volatile unsigned char** c, volatile unsigned char* ev_set, siz
 
 int main(int argc, char* argv[])
 {
-	size_t ev_set_size = 8192 * 4 * KB; // 8192 TLB entries just to be sure :)
+	size_t ev_set_size = 2 * GB;
 	uint64_t target_size = TB; // 1 TB target buffer
 	volatile unsigned char *ev_set;
 	volatile unsigned char *target = (unsigned char*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
