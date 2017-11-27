@@ -42,20 +42,14 @@ int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned short int c
 	{
 
 		buffer[i] = 0xc3;
-	}
-
-	for(i = cache_line_offset; i < size; i += page_size)
-	{
-
-		ptr = (fp)(&(buffer[i]));
-
-		ptr();
+		//ptr = (fp)(&(buffer[i]));
+		//ptr();		
 	}
 
 	return 0;
 }
 
-void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename, unsigned short int pte_offset, uint64_t page_size)
+void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename, unsigned short int pte_offset, uint64_t page_size)
 {
 	int i, j, k;
 	int NUM_MEASUREMENTS = 5; // make 5 measurements and take mean
@@ -67,6 +61,8 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 	fp ptr; // pointer to function stored in the target buffer
 	FILE *f = fopen(filename, "ab+");
 
+	unsigned char* test;
+
 
 	if(f == NULL)
 	{
@@ -75,11 +71,12 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 	}
 
 	//we chose the target instruction at offset 0 within a page
-	(*c)[pte_offset * page_size] = 0xc3;
-	ptr = (fp)&((*c)[pte_offset * page_size]);
-
+	c[pte_offset * page_size] = 0xc3;
+	//ptr = (fp)&(c[pte_offset * page_size]);
+	test = &c[pte_offset * page_size];
 
 	for(i = -1; i < NUMBER_OF_CACHE_OFFSETS; i++){
+
 		for(j = 0; j < NUM_MEASUREMENTS; j++){
 
 			//evict the i-th cacheline for each page in the eviction set
@@ -90,7 +87,7 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 				fclose(f);
 				return;
 			} else if (i < 0) {
-				ptr();
+				*test;
 			}
 
 			asm volatile ("mfence\n\t"
@@ -98,7 +95,10 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 								"RDTSC\n\t"
 								"mov %%rdx, %0\n\t"
 								"mov %%rax, %1\n\t" : "=r"(hi1), "=r"(lo1) : : "%rax", "%rbx", "%rcx", "%rdx");
-			ptr();
+			/*ptr();*/
+
+			asm volatile("movq (%0), %%rax\n" : : "c"(test) : "rax");
+
 			asm volatile ("RDTSCP\n\t"
 								"mov %%rdx, %0\n\t"
 								"mov %%rax, %1\n\t"
@@ -132,10 +132,10 @@ void profile_mem_access(volatile unsigned char** c, volatile unsigned char* ev_s
 }
 
 
-void scan_target(volatile unsigned char** c, volatile unsigned char* ev_set, size_t ev_set_size, uint64_t page_size, char* filename)
+void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, size_t ev_set_size, uint64_t page_size, char* filename)
 {
 		//move 1 page at a time, for now 10 pages should be enough
-		for(int i = 0; i < 128; i++)
+		for(int i = 0; i < 64; i++)
 		{
 			profile_mem_access(c, ev_set, ev_set_size, filename, 8 * i, page_size);
 		}
@@ -144,7 +144,7 @@ void scan_target(volatile unsigned char** c, volatile unsigned char* ev_set, siz
 
 int main(int argc, char* argv[])
 {
-	size_t ev_set_size = 8192 * 4 * KB; // 8192 TLB entries just to be sure :)
+	size_t ev_set_size = 4096 * 4 * KB; // 8192 TLB entries just to be sure :)
 	uint64_t target_size = TB; // 1 TB target buffer
 	volatile unsigned char *ev_set;
 	volatile unsigned char *target = (unsigned char*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -164,7 +164,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	scan_target(&target, ev_set, ev_set_size, 4 * KB, "scan.txt"); // measure for PTL1
+	scan_target(target, ev_set, ev_set_size, 4 * KB, "scan.txt"); // measure for PTL1
 
 	// munmap((void*) target, target_size);
 	// munmap((void*) ev_set, ev_set_size);
