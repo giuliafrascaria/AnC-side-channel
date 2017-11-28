@@ -10,9 +10,8 @@
 #include<string.h>
 #include<limits.h>
 
-#define NUMBER_OF_CORES 8
-#define UNIFIED_TLB_SIZE (NUMBER_OF_CORES * 4096)
-#define I_TLB_SIZE (NUMBER_OF_CORES * 64)
+#define UNIFIED_TLB_SIZE (8 * 4096)
+#define I_TLB_SIZE (8 * 64)
 #define CACHE_LINE_SIZE 64
 #define NUMBER_OF_CACHE_OFFSETS 64
 #define KB (1 << 10)
