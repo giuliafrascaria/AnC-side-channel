@@ -95,8 +95,8 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 
 	//we chose the target instruction at offset 0 within a page
 	c[pte_offset * page_size] = 0xc3;
-	//ptr = (fp)&(c[pte_offset * page_size]);
-	test = &c[pte_offset * page_size];
+	ptr = (fp)&(c[pte_offset * page_size]);
+	//test = &c[pte_offset * page_size];
 
 	for(i = -1; i < NUMBER_OF_CACHE_OFFSETS; i++){
 
