@@ -12,6 +12,7 @@
 
 #define CACHE_LINE_SIZE 64
 #define NUMBER_OF_CACHE_OFFSETS 64
+#define NUM_TLB_ENTRIES 1600
 #define KB (1 << 10)
 #define MB (1 << 20)
 #define GB (1 << 30)
@@ -19,11 +20,41 @@
 
 typedef void (*fp)(void);
 
-int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned short int cache_line_offset, uint64_t page_size)
+void evict_cache(volatile unsigned char *buffer, size_t size, unsigned short int cache_line_offset, uint64_t page_size)
 {
-	int i, j, maxj;
-	fp ptr;
+	if(buffer == NULL)
+	{
+		return;
+	}
+	
+	// store and execute eviction set return instructions
+	for(int i = cache_line_offset; i < size; i += page_size)
+	{
+		buffer[i] = 0xc3;
+	}
+}
 
+void evict_itlb(volatile unsigned char *buffer, unsigned short int cache_line_offset, int entries, uint64_t page_size)
+{
+	volatile fp ptr;
+	
+	if(buffer == NULL)
+	{
+		return;
+	}
+	
+	// store and execute eviction set return instructions
+	for(int i = cache_line_offset; i < entries * page_size; i += page_size)
+	{
+		buffer[i] = 0xc3;
+		ptr = (fp)(&(buffer[i]));
+	
+		ptr();
+	}
+}
+
+int evict(volatile unsigned char *buffer, size_t size, unsigned short int cache_line_offset, uint64_t page_size)
+{
 	if(buffer == NULL)
 	{
 		return -1;
@@ -36,17 +67,9 @@ int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned short int c
 	}
 	
 	cache_line_offset *= CACHE_LINE_SIZE; // convert offset to number of  bytes
-
-	// store and execute eviction set return instructions
-	for(i = cache_line_offset; i < size; i += page_size)
-	{
-
-		buffer[i] = 0xc3;
-		//ptr = (fp)(&(buffer[i]));
-		//ptr();		
-	}
-
-	return 0;
+	
+	evict_cache(buffer, cache_line_offset, NUM_TLB_ENTRIES, page_size);
+	evict_itlb(buffer, size, cache_line_offset, page_size);
 }
 
 void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename, unsigned short int pte_offset, uint64_t page_size)
@@ -58,7 +81,7 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 	uint64_t old, new, base;
 	uint64_t t[NUM_MEASUREMENTS];
 	uint64_t ret; // mean value for measurements
-	fp ptr; // pointer to function stored in the target buffer
+	volatile fp ptr; // pointer to function stored in the target buffer
 	FILE *f = fopen(filename, "ab+");
 
 	unsigned char* test;
@@ -81,7 +104,7 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 
 			//evict the i-th cacheline for each page in the eviction set
 			//evict tlb
-			if(i >= 0 && evict_itlb(ev_set, ev_set_size, i, page_size) < 0)
+			if(i >= 0 && evict(ev_set, ev_set_size, i, page_size) < 0)
 			{
 				printf("Failed to evict TLB\n");
 				fclose(f);
@@ -95,9 +118,9 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 								"RDTSC\n\t"
 								"mov %%rdx, %0\n\t"
 								"mov %%rax, %1\n\t" : "=r"(hi1), "=r"(lo1) : : "%rax", "%rbx", "%rcx", "%rdx");
-			/*ptr();*/
+			ptr();
 
-			asm volatile("movq (%0), %%rax\n" : : "c"(test) : "rax");
+			//asm volatile("movq (%0), %%rax\n" : : "c"(test) : "rax");
 
 			asm volatile ("RDTSCP\n\t"
 								"mov %%rdx, %0\n\t"
@@ -144,7 +167,7 @@ void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, size
 
 int main(int argc, char* argv[])
 {
-	size_t ev_set_size = 4096 * 4 * KB; // 8192 TLB entries just to be sure :)
+	size_t ev_set_size = 8 * MB; // 8192 TLB entries just to be sure :)
 	uint64_t target_size = TB; // 1 TB target buffer
 	volatile unsigned char *ev_set;
 	volatile unsigned char *target = (unsigned char*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
