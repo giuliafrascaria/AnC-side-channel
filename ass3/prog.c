@@ -149,7 +149,7 @@ void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, size
 
 int main(int argc, char* argv[])
 {
-	size_t ev_set_size = 8 * 4096 * KB;
+	size_t ev_set_size = 128 * MB;
 	uint64_t target_size = TB; // 1 TB target buffer
 	volatile unsigned char *ev_set;
 	volatile unsigned char *target = (unsigned char*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
