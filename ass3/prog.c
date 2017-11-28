@@ -46,7 +46,8 @@ int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned short int c
 	}
 
 	// execute i-tlb eviction set
-	for(i = cache_line_offset; i < I_TLB_SIZE * page_size; i += page_size){
+	for(i = cache_line_offset; i < I_TLB_SIZE * page_size; i += page_size)
+	{
 		ptr = (fp)(&(buffer[i]));
 		ptr();
 	}
