@@ -14,6 +14,9 @@ def main():
 		return
 	
 	scan_values = [int(line) for line in open(scan_filepath)]
+	for index, element in enumerate(scan_values):
+		if element > 4400:
+			scan_values[index] = 0
 
 	fig = plt.figure()
 	a = np.reshape(scan_values, (-1, 64))

@@ -42,8 +42,13 @@ int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned short int c
 	{
 
 		buffer[i] = 0xc3;
-		//ptr = (fp)(&(buffer[i]));
-		//ptr();		
+		
+		//ptr();
+				
+	}
+	for(i = cache_line_offset; i < size; i += 8 * page_size){
+		ptr = (fp)(&(buffer[i]));
+		ptr();
 	}
 
 	return 0;
@@ -72,7 +77,7 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 
 	//we chose the target instruction at offset 0 within a page
 	c[pte_offset * page_size] = 0xc3;
-	//ptr = (fp)&(c[pte_offset * page_size]);
+	ptr = (fp)&(c[pte_offset * page_size]);
 	test = &c[pte_offset * page_size];
 
 	for(i = -1; i < NUMBER_OF_CACHE_OFFSETS; i++){
@@ -87,7 +92,8 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 				fclose(f);
 				return;
 			} else if (i < 0) {
-				*test;
+				// *test;
+				ptr();
 			}
 
 			asm volatile ("mfence\n\t"
@@ -95,9 +101,9 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 								"RDTSC\n\t"
 								"mov %%rdx, %0\n\t"
 								"mov %%rax, %1\n\t" : "=r"(hi1), "=r"(lo1) : : "%rax", "%rbx", "%rcx", "%rdx");
-			/*ptr();*/
+			ptr();
 
-			asm volatile("movq (%0), %%rax\n" : : "c"(test) : "rax");
+			// asm volatile("movq (%0), %%rax\n" : : "c"(test) : "rax");
 
 			asm volatile ("RDTSCP\n\t"
 								"mov %%rdx, %0\n\t"
