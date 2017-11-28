@@ -23,7 +23,7 @@ typedef void (*fp)(void);
 
 int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned short int cache_line_offset, uint64_t page_size)
 {
-	int i, j, maxj;
+	int i;
 	fp ptr;
 
 	if(buffer == NULL)
@@ -39,14 +39,10 @@ int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned short int c
 	
 	cache_line_offset *= CACHE_LINE_SIZE; // convert offset to number of  bytes
 
-	// store eviction set return instructions
+	// store eviction set return instructions and flush unified TLB
 	for(i = cache_line_offset; i < UNIFIED_TLB_SIZE * page_size; i += page_size)
 	{
-
 		buffer[i] = 0xc3;
-		
-		//ptr();
-				
 	}
 
 	// execute i-tlb eviction set
@@ -70,9 +66,6 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 	fp ptr; // pointer to function stored in the target buffer
 	FILE *f = fopen(filename, "ab+");
 
-	unsigned char* test;
-
-
 	if(f == NULL)
 	{
 		perror("Failed to open file for printing memory access profiles");
@@ -82,14 +75,12 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 	//we chose the target instruction at offset 0 within a page
 	c[pte_offset * page_size] = 0xc3;
 	ptr = (fp)&(c[pte_offset * page_size]);
-	//test = &c[pte_offset * page_size];
 
 	for(i = -1; i < NUMBER_OF_CACHE_OFFSETS; i++){
 		if(i >= 0){
 			//checking target addresss at a different offset than the i-th
 			c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + pte_offset * page_size] = 0xc3;
 			ptr = (fp)&(c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + pte_offset * page_size]);
-			//test = &c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + pte_offset * page_size];
 		}
 		for(j = 0; j < NUM_MEASUREMENTS; j++){
 
@@ -101,7 +92,6 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 				fclose(f);
 				return;
 			} else if (i < 0) {
-				// *test;
 				ptr();
 			}
 
@@ -111,8 +101,6 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 								"mov %%rdx, %0\n\t"
 								"mov %%rax, %1\n\t" : "=r"(hi1), "=r"(lo1) : : "%rax", "%rbx", "%rcx", "%rdx");
 			ptr();
-
-			// asm volatile("movq (%0), %%rax\n" : : "c"(test) : "rax");
 
 			asm volatile ("RDTSCP\n\t"
 								"mov %%rdx, %0\n\t"
@@ -152,6 +140,7 @@ void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, size
 		//move 1 page at a time, for now 64 pages should be enough
 		for(int i = 0; i < 64; i++)
 		{
+			// offset is 8x page size in order to cross cache line
 			profile_mem_access(c, ev_set, ev_set_size, filename, 8 * i, page_size);
 		}
 }
