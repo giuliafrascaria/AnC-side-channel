@@ -10,6 +10,9 @@
 #include<string.h>
 #include<limits.h>
 
+#define NUMBER_OF_CORES 8
+#define UNIFIED_TLB_SIZE (NUMBER_OF_CORES * 4096)
+#define I_TLB_SIZE (NUMBER_OF_CORES * 64)
 #define CACHE_LINE_SIZE 64
 #define NUMBER_OF_CACHE_OFFSETS 64
 #define KB (1 << 10)
@@ -37,8 +40,8 @@ int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned short int c
 	
 	cache_line_offset *= CACHE_LINE_SIZE; // convert offset to number of  bytes
 
-	// store and execute eviction set return instructions
-	for(i = cache_line_offset; i < size; i += page_size)
+	// store eviction set return instructions
+	for(i = cache_line_offset; i < UNIFIED_TLB_SIZE * page_size; i += page_size)
 	{
 
 		buffer[i] = 0xc3;
@@ -46,7 +49,9 @@ int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned short int c
 		//ptr();
 				
 	}
-	for(i = cache_line_offset; i < size; i += 8 * page_size){
+
+	// execute i-tlb eviction set
+	for(i = cache_line_offset; i < I_TLB_SIZE * page_size; i += page_size){
 		ptr = (fp)(&(buffer[i]));
 		ptr();
 	}
@@ -78,10 +83,15 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 	//we chose the target instruction at offset 0 within a page
 	c[pte_offset * page_size] = 0xc3;
 	ptr = (fp)&(c[pte_offset * page_size]);
-	test = &c[pte_offset * page_size];
+	//test = &c[pte_offset * page_size];
 
 	for(i = -1; i < NUMBER_OF_CACHE_OFFSETS; i++){
-
+		if(i >= 0){
+			//checking target addresss at a different offset than the i-th
+			c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + pte_offset * page_size] = 0xc3;
+			ptr = (fp)&(c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + pte_offset * page_size]);
+			//test = &c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + pte_offset * page_size];
+		}
 		for(j = 0; j < NUM_MEASUREMENTS; j++){
 
 			//evict the i-th cacheline for each page in the eviction set
@@ -140,7 +150,7 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 
 void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, size_t ev_set_size, uint64_t page_size, char* filename)
 {
-		//move 1 page at a time, for now 10 pages should be enough
+		//move 1 page at a time, for now 64 pages should be enough
 		for(int i = 0; i < 64; i++)
 		{
 			profile_mem_access(c, ev_set, ev_set_size, filename, 8 * i, page_size);
@@ -150,7 +160,7 @@ void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, size
 
 int main(int argc, char* argv[])
 {
-	size_t ev_set_size = 4096 * 4 * KB; // 8192 TLB entries just to be sure :)
+	size_t ev_set_size = 8 * 4096 * KB;
 	uint64_t target_size = TB; // 1 TB target buffer
 	volatile unsigned char *ev_set;
 	volatile unsigned char *target = (unsigned char*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
