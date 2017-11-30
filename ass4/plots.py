@@ -4,30 +4,27 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-output_dir_path = '.'
-output_file_prefix = 'scan_'
+scan_filepath = "./scan.txt"
+heat_filepath = "heatmap.png"
 
 def main():
 
-	files = [i for i in os.listdir(output_dir_path) if os.path.isfile(os.path.join(output_dir_path, i)) and output_file_prefix in i]
+	if not os.path.exists(scan_filepath):
+		print("%s not found" % scan_filepath)
+		return
 	
-	for idx, f in enumerate(files):
-		scan_values = [int(line) for line in open(f)]
+	scan_values = [int(line) for line in open(scan_filepath)]
 
-		fig = plt.figure()
-		a = np.reshape(scan_values, (-1, 64))
-		plt.imshow(a, cmap='hot', interpolation='nearest')
-		plt.colorbar()
-		
-		title = "PTL{0}".format(idx + 1)
-		
-		plt.title(title)
-		plt.show()
+	fig = plt.figure()
+	a = np.reshape(scan_values, (-1, 64))
+	plt.imshow(a, cmap='hot', interpolation='none')
+	plt.colorbar()
+	plt.show()
 
-		if os.path.exists(heat_filepath):
-			os.remove(heat_filepath)
+	if os.path.exists(heat_filepath):
+		os.remove(heat_filepath)
 
-		fig.savefig('heatmap_' + title + '.png')
+	fig.savefig(heat_filepath)
 
 if __name__ == "__main__":
 	main()
