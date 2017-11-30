@@ -10,22 +10,55 @@
 #include<string.h>
 #include<limits.h>
 
-#define UNIFIED_TLB_SIZE (8 * 4096)
-#define I_TLB_SIZE (8 * 64)
-#define CACHE_LINE_SIZE 64
-#define NUMBER_OF_CACHE_OFFSETS 64
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
 #define KB (1 << 10)
 #define MB (1 << 20)
 #define GB (1 << 30)
 #define TB (1L << 40)
+#define PAGE_SIZE_PTL1 (4 * KB)
+#define PAGE_SIZE_PTL2 (2 * MB)
+#define PAGE_SIZE_PTL3 (1 * GB)
+#define PAGE_SIZE_PTL4 (512 * GB)
+#define UNIFIED_TLB_SIZE (128 * MB)
+#define I_TLB_SIZE (2 * MB)
+#define NUM_CACHE_ENTRIES_PTL1 1088
+#define NUM_CACHE_ENTRIES_PTL2 32
+#define NUM_CACHE_ENTRIES_PTL3 4
+#define CACHE_LINE_SIZE 64
+#define NUMBER_OF_CACHE_OFFSETS 64
 
 typedef void (*fp)(void);
 
-int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned short int cache_line_offset, uint64_t page_size)
+int evict_instr(volatile unsigned char *buffer, uint64_t i, uint64_t maxi, uint64_t step)
 {
-	int i;
 	fp ptr;
+	
+	for(; i < maxi; i += step)
+	{
+		ptr = (fp)(&(buffer[i]));
+		
+		if(ptr == NULL)
+		{
+			printf("Failed to execute instruction stored in buffer at index %llu\n", i);
+			return -1;
+		}
+		
+		ptr();
+	}
+	
+	return 0;
+}
 
+void evict_data(volatile unsigned char *buffer, uint64_t i, uint64_t maxi, uint64_t step)
+{
+	for(; i < maxi; i += step)
+	{
+		buffer[i] = 0xc3;
+	}
+}
+
+int evict_cacheline(volatile unsigned char *buffer, size_t size, unsigned short int cache_line_offset)
+{
 	if(buffer == NULL)
 	{
 		return -1;
@@ -38,24 +71,24 @@ int evict_itlb(volatile unsigned char *buffer, size_t size, unsigned short int c
 	}
 	
 	cache_line_offset *= CACHE_LINE_SIZE; // convert offset to number of  bytes
-
-	// store eviction set return instructions and flush unified TLB
-	for(i = cache_line_offset; i < UNIFIED_TLB_SIZE * page_size; i += page_size)
+	
+	// store eviction set return instructions and flush unified TLB	
+	evict_data(buffer, cache_line_offset, UNIFIED_TLB_SIZE, PAGE_SIZE_PTL1);
+	
+	// flush iTLB
+	if(evict_instr(buffer, cache_line_offset, I_TLB_SIZE, PAGE_SIZE_PTL1) < 0)
 	{
-		buffer[i] = 0xc3;
+		printf("Failed to evict iTLB\n");
+		return -1;
 	}
-
-	// execute i-tlb eviction set
-	for(i = cache_line_offset; i < I_TLB_SIZE * page_size; i += page_size)
-	{
-		ptr = (fp)(&(buffer[i]));
-		ptr();
-	}
+	
+	// evict PTL1 translation caches
+	evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL1 * PAGE_SIZE_PTL1, PAGE_SIZE_PTL1);
 
 	return 0;
 }
 
-void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename, unsigned short int pte_offset, uint64_t page_size)
+void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename, unsigned short int pte_offset)
 {
 	int i, j, k;
 	int NUM_MEASUREMENTS = 5; // make 5 measurements and take mean
@@ -74,20 +107,20 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 	}
 
 	//we chose the target instruction at offset 0 within a page
-	c[pte_offset * page_size] = 0xc3;
-	ptr = (fp)&(c[pte_offset * page_size]);
+	c[pte_offset * PAGE_SIZE_PTL1] = 0xc3;
+	ptr = (fp)&(c[pte_offset * PAGE_SIZE_PTL1]);
 
 	for(i = -1; i < NUMBER_OF_CACHE_OFFSETS; i++){
 		if(i >= 0){
 			//checking target addresss at a different offset than the i-th
-			c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + pte_offset * page_size] = 0xc3;
-			ptr = (fp)&(c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + pte_offset * page_size]);
+			c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + pte_offset * PAGE_SIZE_PTL1] = 0xc3;
+			ptr = (fp)&(c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + pte_offset * PAGE_SIZE_PTL1]);
 		}
 		for(j = 0; j < NUM_MEASUREMENTS; j++){
 
 			//evict the i-th cacheline for each page in the eviction set
 			//evict tlb
-			if(i >= 0 && evict_itlb(ev_set, ev_set_size, i, page_size) < 0)
+			if(i >= 0 && evict_cacheline(ev_set, ev_set_size, i) < 0)
 			{
 				printf("Failed to evict TLB\n");
 				fclose(f);
@@ -136,13 +169,13 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 }
 
 
-void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, size_t ev_set_size, uint64_t page_size, char* filename)
+void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename)
 {
 		//move 1 page at a time, for now 64 pages should be enough
 		for(int i = 0; i < 64; i++)
 		{
 			// offset is 8x page size in order to cross cache line
-			profile_mem_access(c, ev_set, ev_set_size, filename, 8 * i, page_size);
+			profile_mem_access(c, ev_set, ev_set_size, filename, 8 * i);
 		}
 }
 
@@ -169,7 +202,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	scan_target(target, ev_set, ev_set_size, 4 * KB, "scan.txt"); // measure for PTL1
+	scan_target(target, ev_set, ev_set_size, "scan.txt"); // measure for PTL1
 
 	// munmap((void*) target, target_size);
 	// munmap((void*) ev_set, ev_set_size);
