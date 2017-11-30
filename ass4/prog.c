@@ -57,7 +57,7 @@ void evict_data(volatile unsigned char *buffer, uint64_t i, uint64_t maxi, uint6
 	}
 }
 
-int evict_cacheline(volatile unsigned char *buffer, size_t size, unsigned short int cache_line_offset)
+int evict_cacheline(volatile unsigned char *buffer, size_t size, unsigned short int cache_line_offset, uint64_t page_size)
 {
 	if(buffer == NULL)
 	{
@@ -72,8 +72,11 @@ int evict_cacheline(volatile unsigned char *buffer, size_t size, unsigned short 
 	
 	cache_line_offset *= CACHE_LINE_SIZE; // convert offset to number of  bytes
 	
-	// store eviction set return instructions and flush unified TLB	
+	// flush L3 cache and unified TLB
 	evict_data(buffer, cache_line_offset, UNIFIED_TLB_SIZE, PAGE_SIZE_PTL1);
+	
+	// flush translation cache
+	evict_data(buffer, cache_line_offset, size, page_size);
 	
 	// flush iTLB
 	if(evict_instr(buffer, cache_line_offset, I_TLB_SIZE, PAGE_SIZE_PTL1) < 0)
@@ -82,13 +85,10 @@ int evict_cacheline(volatile unsigned char *buffer, size_t size, unsigned short 
 		return -1;
 	}
 	
-	// evict PTL1 translation caches
-	evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL1 * PAGE_SIZE_PTL1, PAGE_SIZE_PTL1);
-
 	return 0;
 }
 
-void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename, unsigned short int pte_offset)
+void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename, uint64_t offset, uint64_t page_size)
 {
 	int i, j, k;
 	int NUM_MEASUREMENTS = 5; // make 5 measurements and take mean
@@ -107,20 +107,20 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 	}
 
 	//we chose the target instruction at offset 0 within a page
-	c[pte_offset * PAGE_SIZE_PTL1] = 0xc3;
-	ptr = (fp)&(c[pte_offset * PAGE_SIZE_PTL1]);
+	c[offset] = 0xc3;
+	ptr = (fp)&(c[offset]);
 
 	for(i = -1; i < NUMBER_OF_CACHE_OFFSETS; i++){
 		if(i >= 0){
 			//checking target addresss at a different offset than the i-th
-			c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + pte_offset * PAGE_SIZE_PTL1] = 0xc3;
-			ptr = (fp)&(c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + pte_offset * PAGE_SIZE_PTL1]);
+			c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + offset] = 0xc3;
+			ptr = (fp)&(c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + offset]);
 		}
 		for(j = 0; j < NUM_MEASUREMENTS; j++){
 
 			//evict the i-th cacheline for each page in the eviction set
 			//evict tlb
-			if(i >= 0 && evict_cacheline(ev_set, ev_set_size, i) < 0)
+			if(i >= 0 && evict_cacheline(ev_set, ev_set_size, i, page_size) < 0)
 			{
 				printf("Failed to evict TLB\n");
 				fclose(f);
@@ -169,20 +169,22 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 }
 
 
-void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename)
+void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, size_t ev_set_size, uint64_t page_size, char* filename)
 {
-		//move 1 page at a time, for now 64 pages should be enough
-		for(int i = 0; i < 64; i++)
-		{
-			// offset is 8x page size in order to cross cache line
-			profile_mem_access(c, ev_set, ev_set_size, filename, 8 * i);
-		}
+	remove(filename);
+
+	//move 1 page at a time, for now 64 pages should be enough
+	for(int i = 0; i < 64; i++)
+	{
+		// offset is 8x page size in order to cross cache line
+		profile_mem_access(c, ev_set, ev_set_size, filename, 8 * i * page_size, page_size);
+	}
 }
 
 
 int main(int argc, char* argv[])
 {
-	size_t ev_set_size = 128 * MB;
+	size_t ev_set_size = UNIFIED_TLB_SIZE;
 	uint64_t target_size = TB; // 1 TB target buffer
 	volatile unsigned char *ev_set;
 	volatile unsigned char *target = (unsigned char*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -202,7 +204,8 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	scan_target(target, ev_set, ev_set_size, "scan.txt"); // measure for PTL1
+	scan_target(target, ev_set, NUM_CACHE_ENTRIES_PTL1 * PAGE_SIZE_PTL1, PAGE_SIZE_PTL1, "scan_ptl1.txt"); // measure for PTL1
+	scan_target(target, ev_set, NUM_CACHE_ENTRIES_PTL2 * PAGE_SIZE_PTL2, PAGE_SIZE_PTL2, "scan_ptl2.txt"); // measure for PTL2
 
 	// munmap((void*) target, target_size);
 	// munmap((void*) ev_set, ev_set_size);
