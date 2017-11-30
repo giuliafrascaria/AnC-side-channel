@@ -9,15 +9,15 @@ heat_filepath = "heatmap.png"
 
 def main():
 
-	if not os.path.exists(cached_filepath):
-		print("%s not found" % cached_filepath)
+	if not os.path.exists(scan_filepath):
+		print("%s not found" % scan_filepath)
 		return
 	
 	scan_values = [int(line) for line in open(scan_filepath)]
 
 	fig = plt.figure()
 	a = np.reshape(scan_values, (-1, 64))
-	plt.imshow(a, cmap='hot', interpolation='nearest')
+	plt.imshow(a, cmap='hot', interpolation='none')
 	plt.colorbar()
 	plt.show()
 

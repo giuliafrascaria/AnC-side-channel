@@ -1,0 +1,13 @@
+The figures describe the latency when executing an instruction in the target
+buffer triggering a page walk (compared to a base number of ticks observed
+when the target address and its respective page table pages are cached).
+The lighter the colour, the higher the latency.
+Every column represents the specific cacheline offset which has been evicted.
+Every row represents a page in the target buffer.
+We ran our experiment for pages 32KB apart (or 8 PTEs) (heatmap_8pages_offset.png),
+and 4KB apart (or 1 PTE).
+The results, as expected, show the correlation between moving 32KB from the
+target buffer and the latency between consecutive cacheline offsets since,
+accessing a page 32KB from the target virtual address causes crossing a cacheline
+at PTL1 (since a cacheline contains 8 PTE entries), resulting in a downwards
+moving staircase.
