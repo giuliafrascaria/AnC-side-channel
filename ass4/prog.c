@@ -84,11 +84,14 @@ int evict_cacheline(volatile unsigned char *buffer, size_t size, unsigned short 
 	
 	// evict PTL1 translation caches
 	evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL1 * PAGE_SIZE_PTL1, PAGE_SIZE_PTL1);
+	
+	// evict PTL2 translation caches
+	evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL2 * PAGE_SIZE_PTL2, PAGE_SIZE_PTL2);
 
 	return 0;
 }
 
-void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename, unsigned short int pte_offset)
+void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_set, size_t ev_set_size, char* filename, uint64_t offset)
 {
 	int i, j, k;
 	int NUM_MEASUREMENTS = 5; // make 5 measurements and take mean
@@ -107,14 +110,14 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 	}
 
 	//we chose the target instruction at offset 0 within a page
-	c[pte_offset * PAGE_SIZE_PTL1] = 0xc3;
-	ptr = (fp)&(c[pte_offset * PAGE_SIZE_PTL1]);
+	c[offset] = 0xc3;
+	ptr = (fp)&(c[offset]);
 
 	for(i = -1; i < NUMBER_OF_CACHE_OFFSETS; i++){
 		if(i >= 0){
 			//checking target addresss at a different offset than the i-th
-			c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + pte_offset * PAGE_SIZE_PTL1] = 0xc3;
-			ptr = (fp)&(c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + pte_offset * PAGE_SIZE_PTL1]);
+			c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + offset] = 0xc3;
+			ptr = (fp)&(c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + offset]);
 		}
 		for(j = 0; j < NUM_MEASUREMENTS; j++){
 
@@ -175,7 +178,7 @@ void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, size
 		for(int i = 0; i < 64; i++)
 		{
 			// offset is 8x page size in order to cross cache line
-			profile_mem_access(c, ev_set, ev_set_size, filename, 8 * i);
+			profile_mem_access(c, ev_set, ev_set_size, filename, i * ((8 * PAGE_SIZE_PTL1) + (16 * PAGE_SIZE_PTL2)));
 		}
 }
 
