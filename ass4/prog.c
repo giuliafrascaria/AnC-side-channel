@@ -78,6 +78,9 @@ int evict_cacheline(volatile unsigned char *buffer, unsigned short int cache_lin
 	// flush translation cache for PTL2
 	evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL2 * PAGE_SIZE_PTL2, PAGE_SIZE_PTL2);
 	
+	// flush translation cache for PTL3
+	evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL3 * PAGE_SIZE_PTL3, PAGE_SIZE_PTL3);
+	
 	// flush iTLB
 	if(evict_instr(buffer, cache_line_offset, I_TLB_SIZE, PAGE_SIZE_PTL1) < 0)
 	{
@@ -175,18 +178,18 @@ void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, char
 	//move 1 page at a time, for now 64 pages should be enough
 	for(int i = 0; i < 64; i++)
 	{
-		// cross 1 cacheline at a time on PTL2 and 2 cachelines at PTL1
-		profile_mem_access(c, ev_set, 8 * i * (PAGE_SIZE_PTL2 + 2 * PAGE_SIZE_PTL1), filename);
+		// cross 1 cacheline at a time on PTL3, 2 cachelines at PTL2, and 3 cachelines at PTL1
+		profile_mem_access(c, ev_set, 8 * i * (PAGE_SIZE_PTL3 + 2 * PAGE_SIZE_PTL2 + 3 * PAGE_SIZE_PTL1), filename);
 	}
 }
 
 
 int main(int argc, char* argv[])
 {
-	size_t ev_set_size = UNIFIED_TLB_SIZE;
+	size_t ev_set_size = TB; // TODO investigate why allocating more causes segfault when accessing
 	uint64_t target_size = TB; // 1 TB target buffer
 	volatile unsigned char *ev_set;
-	volatile unsigned char *target = (unsigned char*)mmap(NULL, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	volatile unsigned char *target = (unsigned char*)mmap((void*)0x6fffffffffff, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 	if(target == MAP_FAILED)
 	{
@@ -212,3 +215,4 @@ int main(int argc, char* argv[])
 
 	return 0;
 }
+
