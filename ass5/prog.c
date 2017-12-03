@@ -10,7 +10,6 @@
 #include<string.h>
 #include<limits.h>
 
-#define MAX(a,b) ((a) > (b) ? (a) : (b))
 #define KB (1 << 10)
 #define MB (1 << 20)
 #define GB (1 << 30)
@@ -27,6 +26,11 @@
 #define NUM_CACHE_ENTRIES_PTL4 4
 #define CACHE_LINE_SIZE 64
 #define NUMBER_OF_CACHE_OFFSETS 64
+#define FLUSH_ALL_PTL 0
+#define FLUSH_PTL4 4
+#define FLUSH_PTL3 3
+#define FLUSH_PTL2 2
+#define FLUSH_PTL1 1
 
 typedef void (*fp)(void);
 
@@ -58,8 +62,14 @@ void evict_data(volatile unsigned char *buffer, uint64_t i, uint64_t maxi, uint6
 	}
 }
 
-int evict_cacheline(volatile unsigned char *buffer, unsigned short int cache_line_offset)
+int evict_cacheline(volatile unsigned char *buffer, unsigned short int cache_line_offset, unsigned short int flush_lvl)
 {
+	if(flush_lvl > 4)
+	{
+		printf("flush_lvl is more than 4 (level number). Use 0 to flush all levels of translation caches.\n");
+		return -1;
+	}
+	
 	if(buffer == NULL)
 	{
 		return -1;
@@ -73,17 +83,29 @@ int evict_cacheline(volatile unsigned char *buffer, unsigned short int cache_lin
 	
 	cache_line_offset *= CACHE_LINE_SIZE; // convert offset to number of  bytes
 	
-	// flush L3 cache, unified TLB and translation cache for PTL1
-	evict_data(buffer, cache_line_offset, UNIFIED_TLB_SIZE, PAGE_SIZE_PTL1);
+	if(flush_lvl == FLUSH_ALL_PTL || flush_lvl == FLUSH_PTL1)
+	{
+		// flush L3 cache, unified TLB and translation cache for PTL1
+		evict_data(buffer, cache_line_offset, UNIFIED_TLB_SIZE, PAGE_SIZE_PTL1);
+	}
 	
-	// flush translation cache for PTL2
-	evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL2 * PAGE_SIZE_PTL2, PAGE_SIZE_PTL2);
+	if(flush_lvl == FLUSH_ALL_PTL || flush_lvl == FLUSH_PTL2)
+	{
+		// flush translation cache for PTL2
+		evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL2 * PAGE_SIZE_PTL2, PAGE_SIZE_PTL2);
+	}
 	
-	// flush translation cache for PTL3
-	evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL3 * PAGE_SIZE_PTL3, PAGE_SIZE_PTL3);
+	if(flush_lvl == FLUSH_ALL_PTL || flush_lvl == FLUSH_PTL3)
+	{
+		// flush translation cache for PTL3
+		evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL3 * PAGE_SIZE_PTL3, PAGE_SIZE_PTL3);
+	}
 	
-	// flush translation cache for PTL4
-	evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL4 * PAGE_SIZE_PTL4, PAGE_SIZE_PTL4);
+	if(flush_lvl == FLUSH_ALL_PTL || flush_lvl == FLUSH_PTL4)
+	{
+		// flush translation cache for PTL4
+		evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL4 * PAGE_SIZE_PTL4, PAGE_SIZE_PTL4);
+	}
 	
 	// flush iTLB
 	if(evict_instr(buffer, cache_line_offset, I_TLB_SIZE, PAGE_SIZE_PTL1) < 0)
@@ -95,7 +117,7 @@ int evict_cacheline(volatile unsigned char *buffer, unsigned short int cache_lin
 	return 0;
 }
 
-void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_set, uint64_t offset, char* filename)
+void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_set, uint64_t offset, unsigned short int flush_lvl, char* filename)
 {
 	int i, j, k;
 	int NUM_MEASUREMENTS = 5; // make 5 measurements and take mean
@@ -105,7 +127,11 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 	uint64_t t[NUM_MEASUREMENTS];
 	uint64_t ret; // mean value for measurements
 	fp ptr; // pointer to function stored in the target buffer
-	FILE *f = fopen(filename, "ab+");
+	FILE *f;
+	
+	remove(filename);
+	
+	f = fopen(filename, "ab+");
 
 	if(f == NULL)
 	{
@@ -126,7 +152,7 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 		for(j = 0; j < NUM_MEASUREMENTS; j++){
 		
 			//evict the i-th cacheline for each page in the eviction set
-			if(i >= 0 && evict_cacheline(ev_set, i) < 0)
+			if(i >= 0 && evict_cacheline(ev_set, i, flush_lvl) < 0)
 			{
 				printf("Failed to evict TLB\n");
 				fclose(f);
@@ -175,23 +201,35 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 }
 
 
-void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, char* filename)
+void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set)
 {
-	remove(filename);
-
-	//move 1 page at a time, for now 64 pages should be enough
-	// for(int i = 0; i < 16; i++)
-	// {	
-	// 	// + 2 * PAGE_SIZE_PTL2 + 3 * PAGE_SIZE_PTL1
-	// 	// cross 1 cacheline at a time on PTL3, 2 cachelines at PTL2, and 3 cachelines at PTL1
-	// 	profile_mem_access(c, ev_set, 8 * i * (PAGE_SIZE_PTL3 + 2 * PAGE_SIZE_PTL2 + 3 * PAGE_SIZE_PTL1), filename);
-	// }
+	int i;
 	
-	//move 1 page at a time, for now 16 pages should be enough
-	for(int i = 0; i < 24; i++)
+	//move 1 page at a time, for now 24 pages should be enough
+	for(i = 0; i < 24; i++)
 	{
 		// cross 1 cacheline at a time on PTL4, 2 cachelines at PTL3, and 3 cachelines at PTL2 and 4 cachelines at PTL1
-		profile_mem_access(c, ev_set, 8 * i * (PAGE_SIZE_PTL4 + 2 * PAGE_SIZE_PTL3 + 3 * PAGE_SIZE_PTL2 + 4 * PAGE_SIZE_PTL1), filename);
+		profile_mem_access(c, ev_set, 8 * i * (PAGE_SIZE_PTL4 + 2 * PAGE_SIZE_PTL3 + 3 * PAGE_SIZE_PTL2 + 4 * PAGE_SIZE_PTL1), FLUSH_ALL_PTL, "scan.txt");
+	}
+	
+	for(i = 0; i < 8; i++)
+	{
+		profile_mem_access(c, ev_set, PAGE_SIZE_PTL1, FLUSH_PTL1, "scan_1.txt");
+	}
+	
+	for(i = 0; i < 8; i++)
+	{
+		profile_mem_access(c, ev_set, PAGE_SIZE_PTL2, FLUSH_PTL2, "scan_2.txt");
+	}
+	
+	for(i = 0; i < 8; i++)
+	{
+		profile_mem_access(c, ev_set, PAGE_SIZE_PTL3, FLUSH_PTL3, "scan_3.txt");
+	}
+	
+	for(i = 0; i < 8; i++)
+	{
+		profile_mem_access(c, ev_set, PAGE_SIZE_PTL4, FLUSH_PTL4, "scan_4.txt");
 	}
 }
 
@@ -219,7 +257,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	scan_target(target, ev_set, "scan.txt");
+	scan_target(target, ev_set);
 
 	// munmap((void*) target, target_size);
 	// munmap((void*) ev_set, ev_set_size);
