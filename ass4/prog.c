@@ -207,8 +207,6 @@ int main(int argc, char* argv[])
 		perror("Failed to map memory.");
 		return -1;
 	}
-	
-	printf("%p\n", target);
 
 	ev_set = (unsigned char*)mmap(NULL, ev_set_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
