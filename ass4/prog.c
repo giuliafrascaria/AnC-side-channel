@@ -81,6 +81,9 @@ int evict_cacheline(volatile unsigned char *buffer, unsigned short int cache_lin
 	// flush translation cache for PTL3
 	evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL3 * PAGE_SIZE_PTL3, PAGE_SIZE_PTL3);
 	
+	// flush translation cache for PTL4
+	//evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL4 * PAGE_SIZE_PTL4, PAGE_SIZE_PTL4);
+	
 	// flush iTLB
 	if(evict_instr(buffer, cache_line_offset, I_TLB_SIZE, PAGE_SIZE_PTL1) < 0)
 	{
@@ -181,6 +184,13 @@ void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, char
 		// cross 1 cacheline at a time on PTL3, 2 cachelines at PTL2, and 3 cachelines at PTL1
 		profile_mem_access(c, ev_set, 8 * i * (PAGE_SIZE_PTL3 + 2 * PAGE_SIZE_PTL2 + 3 * PAGE_SIZE_PTL1), filename);
 	}
+	
+	//move 1 page at a time, for now 16 pages should be enough
+	/*for(int i = 0; i < 16; i++)
+	{
+		// cross 1 cacheline at a time on PTL4, 2 cachelines at PTL3, and 3 cachelines at PTL2 and 4 cachelines at PTL1
+		profile_mem_access(c, ev_set, 8 * i * (PAGE_PAGE_PTL4 + 2 * PAGE_SIZE_PTL3 + 3 * PAGE_SIZE_PTL2 + 4 * PAGE_SIZE_PTL1), filename);
+	}*/
 }
 
 
@@ -189,7 +199,7 @@ int main(int argc, char* argv[])
 	size_t ev_set_size = TB; // TODO investigate why allocating more causes segfault when accessing
 	uint64_t target_size = TB; // 1 TB target buffer
 	volatile unsigned char *ev_set;
-	volatile unsigned char *target = (unsigned char*)mmap((void*)0x6fffffffffff, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	volatile unsigned char *target = (unsigned char*)mmap((void*)0x6fffffffffff, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
 
 	if(target == MAP_FAILED)
 	{
