@@ -196,10 +196,10 @@ void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, char
 
 int main(int argc, char* argv[])
 {
-	size_t ev_set_size = TB; // TODO investigate why allocating more causes segfault when accessing
-	uint64_t target_size = TB;
+	size_t ev_set_size = 5 * GB;
+	uint64_t target_size = 64 * TB;
 	volatile unsigned char *ev_set;
-	uint64_t target_addr = 6 * TB;
+	uint64_t target_addr = 4 * TB;
 	volatile unsigned char *target = (unsigned char*)mmap((void*)target_addr, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 	if(target == MAP_FAILED)
