@@ -17,13 +17,14 @@
 #define TB (1L << 40)
 #define PAGE_SIZE_PTL1 (4 * KB)
 #define PAGE_SIZE_PTL2 (2 * MB)
-#define PAGE_SIZE_PTL3 (1 * GB)
-#define PAGE_SIZE_PTL4 (512 * GB)
+#define PAGE_SIZE_PTL3 (1L * GB)
+#define PAGE_SIZE_PTL4 (512L * GB)
 #define UNIFIED_TLB_SIZE (128 * MB)
 #define I_TLB_SIZE (2 * MB)
 #define NUM_CACHE_ENTRIES_PTL1 1088
 #define NUM_CACHE_ENTRIES_PTL2 32
 #define NUM_CACHE_ENTRIES_PTL3 4
+#define NUM_CACHE_ENTRIES_PTL4 4
 #define CACHE_LINE_SIZE 64
 #define NUMBER_OF_CACHE_OFFSETS 64
 
@@ -82,7 +83,7 @@ int evict_cacheline(volatile unsigned char *buffer, unsigned short int cache_lin
 	evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL3 * PAGE_SIZE_PTL3, PAGE_SIZE_PTL3);
 	
 	// flush translation cache for PTL4
-	//evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL4 * PAGE_SIZE_PTL4, PAGE_SIZE_PTL4);
+	evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL4 * PAGE_SIZE_PTL4, PAGE_SIZE_PTL4);
 	
 	// flush iTLB
 	if(evict_instr(buffer, cache_line_offset, I_TLB_SIZE, PAGE_SIZE_PTL1) < 0)
@@ -179,27 +180,28 @@ void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, char
 	remove(filename);
 
 	//move 1 page at a time, for now 64 pages should be enough
-	for(int i = 0; i < 64; i++)
-	{
-		// cross 1 cacheline at a time on PTL3, 2 cachelines at PTL2, and 3 cachelines at PTL1
-		profile_mem_access(c, ev_set, 8 * i * (PAGE_SIZE_PTL3 + 2 * PAGE_SIZE_PTL2 + 3 * PAGE_SIZE_PTL1), filename);
-	}
+	// for(int i = 0; i < 16; i++)
+	// {	
+	// 	// + 2 * PAGE_SIZE_PTL2 + 3 * PAGE_SIZE_PTL1
+	// 	// cross 1 cacheline at a time on PTL3, 2 cachelines at PTL2, and 3 cachelines at PTL1
+	// 	profile_mem_access(c, ev_set, 8 * i * (PAGE_SIZE_PTL3 + 2 * PAGE_SIZE_PTL2 + 3 * PAGE_SIZE_PTL1), filename);
+	// }
 	
 	//move 1 page at a time, for now 16 pages should be enough
-	/*for(int i = 0; i < 16; i++)
+	for(int i = 0; i < 24; i++)
 	{
 		// cross 1 cacheline at a time on PTL4, 2 cachelines at PTL3, and 3 cachelines at PTL2 and 4 cachelines at PTL1
-		profile_mem_access(c, ev_set, 8 * i * (PAGE_PAGE_PTL4 + 2 * PAGE_SIZE_PTL3 + 3 * PAGE_SIZE_PTL2 + 4 * PAGE_SIZE_PTL1), filename);
-	}*/
+		profile_mem_access(c, ev_set, 8 * i * (PAGE_SIZE_PTL4 + 2 * PAGE_SIZE_PTL3 + 3 * PAGE_SIZE_PTL2 + 4 * PAGE_SIZE_PTL1), filename);
+	}
 }
 
 
 int main(int argc, char* argv[])
 {
-	size_t ev_set_size = 5 * GB;
-	uint64_t target_size = 64 * TB;
+	size_t ev_set_size = 5L * TB;
+	uint64_t target_size = 96 * TB;
 	volatile unsigned char *ev_set;
-	uint64_t target_addr = 4 * TB;
+	uint64_t target_addr = 4L * TB;
 	volatile unsigned char *target = (unsigned char*)mmap((void*)target_addr, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 	if(target == MAP_FAILED)
