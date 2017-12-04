@@ -9,8 +9,8 @@
 #include<unistd.h>
 #include<string.h>
 #include<limits.h>
+#include<inttypes.h>
 
-#define MAX(a,b) ((a) > (b) ? (a) : (b))
 #define KB (1 << 10)
 #define MB (1 << 20)
 #define GB (1 << 30)
@@ -40,7 +40,7 @@ int evict_instr(volatile unsigned char *buffer, uint64_t i, uint64_t maxi, uint6
 		
 		if(ptr == NULL)
 		{
-			printf("Failed to execute instruction stored in buffer at index %llu\n", i);
+			printf("Failed to execute instruction stored in buffer at index %" PRIu64 "\n", i);
 			return -1;
 		}
 		
@@ -113,25 +113,28 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 		return;
 	}
 
-	//we chose the target instruction at offset 0 within a page
 	c[offset] = 0xc3;
 	ptr = (fp)&(c[offset]);
 
-	for(i = -1; i < NUMBER_OF_CACHE_OFFSETS; i++){
-		if(i >= 0){
+	for(i = -1; i < NUMBER_OF_CACHE_OFFSETS; i++)
+	{
+		if(i >= 0)
+		{
 			//checking target addresss at a different offset than the i-th
 			c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + offset] = 0xc3;
 			ptr = (fp)&(c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + offset]);
 		}
-		for(j = 0; j < NUM_MEASUREMENTS; j++){
 		
-			//evict the i-th cacheline for each page in the eviction set
+		for(j = 0; j < NUM_MEASUREMENTS; j++)
+		{		
+			//evict the i-th cacheline
 			if(i >= 0 && evict_cacheline(ev_set, i) < 0)
 			{
 				printf("Failed to evict TLB\n");
 				fclose(f);
 				return;
 			} else if (i < 0) {
+				// execute target instruction to get timing baseline (cached)
 				ptr();
 			}
 
@@ -153,9 +156,10 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 			t[j] = new - old;
 		}
 
-		ret = 0;
+		ret = 0; // stores mean value of measurements
 		
-		for(j = 0; j < NUM_MEASUREMENTS; j++){
+		for(j = 0; j < NUM_MEASUREMENTS; j++)
+		{
 			ret += t[j];		
 		}
 		
@@ -167,7 +171,7 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 			fclose(f);
 			return;
 		} else if (i < 0) {
-			base = ret;
+			base = ret; // set base (cached access) timing measurement
 		}
 	}
 
@@ -178,16 +182,8 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, char* filename)
 {
 	remove(filename);
-
-	//move 1 page at a time, for now 64 pages should be enough
-	// for(int i = 0; i < 16; i++)
-	// {	
-	// 	// + 2 * PAGE_SIZE_PTL2 + 3 * PAGE_SIZE_PTL1
-	// 	// cross 1 cacheline at a time on PTL3, 2 cachelines at PTL2, and 3 cachelines at PTL1
-	// 	profile_mem_access(c, ev_set, 8 * i * (PAGE_SIZE_PTL3 + 2 * PAGE_SIZE_PTL2 + 3 * PAGE_SIZE_PTL1), filename);
-	// }
 	
-	//move 1 page at a time, for now 16 pages should be enough
+	//move 1 page at a time, for now 24 pages should be enough
 	for(int i = 0; i < 24; i++)
 	{
 		// cross 1 cacheline at a time on PTL4, 2 cachelines at PTL3, and 3 cachelines at PTL2 and 4 cachelines at PTL1
