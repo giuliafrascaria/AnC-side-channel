@@ -115,21 +115,15 @@ def main():
 		return -1
 	
 	for i in range(4):
-		print("Cacheline offset at PTL{0}: {1}".format(4 - i, offsets[i]))
-	
-	print('\n')
-	
-	for i in range(4):
-		result = result << 6
-		result |= offsets[i]
-		result = result << 3
-		slot = find_slot_offset(4 - i)
+		slot = (offsets[i] << 3) | find_slot_offset(4 - i)
+		
 		print("Slot at PTL{0}: {1}".format(4-i, slot))
+		
 		if slot < 0:
 			print("Failed to correctly identify offset within cacheline for level {0}".format(4 - i))
 			return
-		print(slot)
-		result |= slot
+		
+		result = (result << 9) | slot
 	
 	print("\nDerandomized virtual address is:")
 	print(format(result << 12, '#04x'))
