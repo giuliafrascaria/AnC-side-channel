@@ -213,24 +213,24 @@ void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set)
 		profile_mem_access(c, ev_set, 8 * i * (PAGE_SIZE_PTL4 + 2 * PAGE_SIZE_PTL3 + 3 * PAGE_SIZE_PTL2 + 4 * PAGE_SIZE_PTL1), FLUSH_ALL_PTL, "scan.txt");
 	}
 	
-	for(i = 0; i < 8; i++)
+	for(i = 0; i < 9; i++)
 	{
-		profile_mem_access(c, ev_set, i * PAGE_SIZE_PTL1, FLUSH_PTL1, "scan_1.txt");
+		profile_mem_access(c, ev_set, i * PAGE_SIZE_PTL1, FLUSH_ALL_PTL, "scan_1.txt");
 	}
 	
-	for(i = 0; i < 8; i++)
+	for(i = 0; i < 9; i++)
 	{
-		profile_mem_access(c, ev_set, i * PAGE_SIZE_PTL2, FLUSH_PTL2, "scan_2.txt");
+		profile_mem_access(c, ev_set, i * PAGE_SIZE_PTL2, FLUSH_ALL_PTL, "scan_2.txt");
 	}
 	
-	for(i = 0; i < 8; i++)
+	for(i = 0; i < 9; i++)
 	{
-		profile_mem_access(c, ev_set, i * PAGE_SIZE_PTL3, FLUSH_PTL3, "scan_3.txt");
+		profile_mem_access(c, ev_set, i * PAGE_SIZE_PTL3, FLUSH_ALL_PTL, "scan_3.txt");
 	}
 	
-	for(i = 0; i < 8; i++)
+	for(i = 0; i < 9; i++)
 	{
-		profile_mem_access(c, ev_set, i * PAGE_SIZE_PTL4, FLUSH_PTL4, "scan_4.txt");
+		profile_mem_access(c, ev_set, i * PAGE_SIZE_PTL4, FLUSH_ALL_PTL, "scan_4.txt");
 	}
 }
 
@@ -238,9 +238,9 @@ void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set)
 int main(int argc, char* argv[])
 {
 	size_t ev_set_size = 5L * TB;
-	uint64_t target_size = 96 * TB;
+	uint64_t target_size = 96L * TB;
 	volatile unsigned char *ev_set;
-	uint64_t target_addr = 4L * TB;
+	uint64_t target_addr = 64L * TB + 123342452223L;
 	volatile unsigned char *target = (unsigned char*)mmap((void*)target_addr, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 	if(target == MAP_FAILED)
