@@ -57,38 +57,41 @@ def find_slot_offset(lvl):
 
 	f = open(scan_filename, 'r')
 	scan_values = [int(line) for line in f]
-	a = np.reshape(scan_values, (-1, 64))
-	a_summed = a.sum(axis=0)
-	enum = enumerate(a_summed)
-	offsets = [i for i,j in enum if j == max(a_summed)]
+	a = np.reshape(scan_values, (-1, 64)).transpose()
 	
-	prev_index = (offsets[0] + 63) % 64
-	next_index = (offsets[0] + 65) % 64
-	
-	page = 0
-	
-	if a_summed[prev_index] > a_summed[next_index]:
-		while a[page][prev_index] > a[page][offsets[0]]:
-			page += 1
-	else:
-		while a[page][offsets[0]] > a[page][next_index]:
-			page += 1
-	
-	return 8 - page
+	for offset in range(len(a)):
+		i = 0
+		j = len(a[offset]) - 1
+		next_offset = (offset + 1) % len(a[offset])
+		
+		while a[offset][i] > a[next_offset][i]:
+			i += 1
+		
+		while a[offset][j] < a[next_offset][j]:
+			j -= 1
+		
+		if j == i - 1:
+			return 8 - j
+			
+	return -1
 
 
 def main():
 	result = 0
 	offsets = find_cacheline_offsets()
-	result = (offsets[0] << 3) | find_slot_offset(4)
-	result = result << 9
-	result = (offsets[1] << 3) | find_slot_offset(3)
-	result = result << 9
-	result = (offsets[2] << 3) | find_slot_offset(2)
-	result = result << 9
-	result = (offsets[3] << 3) | find_slot_offset(1)
 	
-	print(format(result << 12, '#04x'))
+	for i in range(4):
+		result = result << 3
+		slot = find_slot_offset(4 - i)
+		
+		if slot < 0:
+			print("Failed to correctly identify offset within cacheline for level {0}".format(4 - i))
+			return
+		
+		result |= slot
+	
+	print(format(result << 12, '#04x')) #TODO identify offset within frame
+
 
 if __name__ == "__main__":
 	main()
