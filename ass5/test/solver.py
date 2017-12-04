@@ -5,7 +5,8 @@ import os
 import numpy as np
 import subprocess
 
-scan_filename = 'scan.txt'
+scan_filename = './scan.txt'
+MARGIN_OF_ERROR = 0.8
 
 
 def find_cacheline_offsets():
@@ -50,27 +51,27 @@ def find_cacheline_offsets():
 
 
 def find_slot_offset(lvl):
-	filename = 'scan_{0}.txt'.format(lvl)
+	filename = './scan_{0}.txt'.format(lvl)
 	
 	if not os.path.isfile(filename):
 		print("{0} does not exist".format(filename))
 		return -1
 
-	f = open(scan_filename, 'r')
+	f = open(filename, 'r')
 	scan_values = [int(line) for line in f]
-	a = np.reshape(scan_values, (-1, 64)).transpose()
+	a = np.reshape(scan_values, (-1, 64))
 	
-	for offset in range(len(a)):
+	for offset in range(64):
 		i = 0
-		j = len(a[offset]) - 1
-		next_offset = (offset + 1) % len(a[offset])
+		j = 8
+		next_offset = (offset + 1) % 64
 		
-		while a[offset][i] > a[next_offset][i]:
+		while i <= 8 and a[i][offset] > MARGIN_OF_ERROR * a[i][next_offset]:
 			i += 1
 		
-		while a[offset][j] < a[next_offset][j]:
+		while j >= 0 and MARGIN_OF_ERROR * a[j][offset] < a[j][next_offset]:
 			j -= 1
-		
+
 		if j == i - 1:
 			return 8 - j
 			
@@ -109,17 +110,29 @@ def main():
 	result = 0
 	offsets = find_cacheline_offsets()
 	
+	if len(offsets) != 4:
+		print("Something's not right here.. Found {0} PT levels".format(len(offsets)))
+		return -1
+	
 	for i in range(4):
+		print("Cacheline offset at PTL{0}: {1}".format(4 - i, offsets[i]))
+	
+	print('\n')
+	
+	for i in range(4):
+		result = result << 6
+		result |= offsets[i]
 		result = result << 3
 		slot = find_slot_offset(4 - i)
-		
+		print("Slot at PTL{0}: {1}".format(4-i, slot))
 		if slot < 0:
 			print("Failed to correctly identify offset within cacheline for level {0}".format(4 - i))
 			return
-		
+		print(slot)
 		result |= slot
 	
-	print(format(result << 12, '#04x')) #TODO identify offset within frame
+	print("\nDerandomized virtual address is:")
+	print(format(result << 12, '#04x'))
 
 
 if __name__ == "__main__":
