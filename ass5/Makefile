@@ -7,5 +7,6 @@ prog: prog.o
 	gcc prog.o -o prog
 
 clean:
+	rm -rf scan*.txt
 	rm -rf prog.o
 	rm -rf prog
