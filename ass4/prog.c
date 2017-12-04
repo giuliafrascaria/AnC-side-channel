@@ -9,6 +9,7 @@
 #include<unistd.h>
 #include<string.h>
 #include<limits.h>
+#include<inttypes.h>
 
 #define KB (1 << 10)
 #define MB (1 << 20)
@@ -39,7 +40,7 @@ int evict_instr(volatile unsigned char *buffer, uint64_t i, uint64_t maxi, uint6
 		
 		if(ptr == NULL)
 		{
-			printf("Failed to execute instruction stored in buffer at index %llu\n", i);
+			printf("Failed to execute instruction stored in buffer at index %" PRIu64 "\n", i);
 			return -1;
 		}
 		
