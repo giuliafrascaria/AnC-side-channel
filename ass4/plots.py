@@ -8,7 +8,7 @@ scan_filename = 'scan.txt'
 fig_filename = 'heatmap.png'
 explanation = 'The memorygram displays signals on all PT levels. \n' \
 	'With every row, we move from the target address at offsets such that \n' \
-	'we cross 1 cacheline at PTL4, 2 cachelines at PTL3, \n2 cachelines at PTL2, ' \
+	'we cross 1 cacheline at PTL4, 2 cachelines at PTL3, \n3 cachelines at PTL2, ' \
 	'and 4 cachelines at PTL1. \nThis results in a staircase moving one cacheline \n' \
 	'with every row, corresponding to the PTL4 signal, \none moving 2 cachelines, ' \
 	'corresponding to the PTL3 signal, \none staircase moving 3 cachelines with ' \
