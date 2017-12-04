@@ -127,11 +127,7 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 	uint64_t t[NUM_MEASUREMENTS];
 	uint64_t ret; // mean value for measurements
 	fp ptr; // pointer to function stored in the target buffer
-	FILE *f;
-	
-	remove(filename);
-	
-	f = fopen(filename, "ab+");
+	FILE *f = fopen(filename, "ab+");
 
 	if(f == NULL)
 	{
@@ -204,6 +200,12 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set)
 {
 	int i;
+	
+	remove("scan.txt");
+	remove("scan_1.txt");
+	remove("scan_2.txt");
+	remove("scan_3.txt");
+	remove("scan_4.txt");
 	
 	//move 1 page at a time, for now 24 pages should be enough
 	for(i = 0; i < 24; i++)
