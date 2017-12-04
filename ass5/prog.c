@@ -9,6 +9,7 @@
 #include<unistd.h>
 #include<string.h>
 #include<limits.h>
+#include<inttypes.h>
 
 #define KB (1 << 10)
 #define MB (1 << 20)
@@ -44,7 +45,7 @@ int evict_instr(volatile unsigned char *buffer, uint64_t i, uint64_t maxi, uint6
 		
 		if(ptr == NULL)
 		{
-			printf("Failed to execute instruction stored in buffer at index %llu\n", i);
+			printf("Failed to execute instruction stored in buffer at index %" PRIu64 "\n", i);
 			return -1;
 		}
 		
@@ -249,6 +250,8 @@ int main(int argc, char* argv[])
 		perror("Failed to map memory.");
 		return -1;
 	}
+	
+	printf("Target virtual address is: %p\n", (void*) &target);
 
 	ev_set = (unsigned char*)mmap(NULL, ev_set_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 

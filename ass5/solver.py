@@ -3,6 +3,7 @@
 from __future__ import division
 import os
 import numpy as np
+import subprocess
 
 scan_filename = 'scan.txt'
 
@@ -74,9 +75,37 @@ def find_slot_offset(lvl):
 			return 8 - j
 			
 	return -1
+	
+	
+def make_prog():
+	make_process = subprocess.Popen(['make', 'clean', 'all'], stderr=subprocess.STDOUT)
+	
+	if make_process.wait() != 0:
+		print("Failed to make prog")
+		return -1
+		
+	return 0
+	
+
+def run_prog():
+	return subprocess.check_call(["./prog"])
 
 
 def main():
+	print("Compiling prog..")
+
+	if make_prog() < 0:
+		return -1
+		
+	print("Successfully compiled prog")
+	print("Executing prog, profiling memory accesses..")
+	
+	if run_prog() < 0:
+		print("Failed to run prog")
+		return -1
+		
+	print("Finished running prog, solving target address based on memory profiles..")
+	
 	result = 0
 	offsets = find_cacheline_offsets()
 	
