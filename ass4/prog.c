@@ -33,20 +33,20 @@ typedef void (*fp)(void);
 int evict_instr(volatile unsigned char *buffer, uint64_t i, uint64_t maxi, uint64_t step)
 {
 	fp ptr;
-	
+
 	for(; i < maxi; i += step)
 	{
 		ptr = (fp)(&(buffer[i]));
-		
+
 		if(ptr == NULL)
 		{
 			printf("Failed to execute instruction stored in buffer at index %" PRIu64 "\n", i);
 			return -1;
 		}
-		
+
 		ptr();
 	}
-	
+
 	return 0;
 }
 
@@ -64,34 +64,34 @@ int evict_cacheline(volatile unsigned char *buffer, unsigned short int cache_lin
 	{
 		return -1;
 	}
-	
+
 	if(cache_line_offset >= NUMBER_OF_CACHE_OFFSETS)
 	{
 		printf("Cache line offset must be between 0 and 63 (incl.)\n");
 		return -1;
 	}
-	
+
 	cache_line_offset *= CACHE_LINE_SIZE; // convert offset to number of  bytes
-	
+
 	// flush L3 cache, unified TLB and translation cache for PTL1
 	evict_data(buffer, cache_line_offset, UNIFIED_TLB_SIZE, PAGE_SIZE_PTL1);
-	
+
 	// flush translation cache for PTL2
 	evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL2 * PAGE_SIZE_PTL2, PAGE_SIZE_PTL2);
-	
+
 	// flush translation cache for PTL3
 	evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL3 * PAGE_SIZE_PTL3, PAGE_SIZE_PTL3);
-	
+
 	// flush translation cache for PTL4
 	evict_data(buffer, cache_line_offset, NUM_CACHE_ENTRIES_PTL4 * PAGE_SIZE_PTL4, PAGE_SIZE_PTL4);
-	
+
 	// flush iTLB
 	if(evict_instr(buffer, cache_line_offset, I_TLB_SIZE, PAGE_SIZE_PTL1) < 0)
 	{
 		printf("Failed to evict iTLB\n");
 		return -1;
 	}
-	
+
 	return 0;
 }
 
@@ -124,9 +124,9 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 			c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + offset] = 0xc3;
 			ptr = (fp)&(c[(((i + 1) % NUMBER_OF_CACHE_OFFSETS) * CACHE_LINE_SIZE) + offset]);
 		}
-		
+
 		for(j = 0; j < NUM_MEASUREMENTS; j++)
-		{		
+		{
 			//evict the i-th cacheline
 			if(i >= 0 && evict_cacheline(ev_set, i) < 0)
 			{
@@ -157,14 +157,20 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 		}
 
 		ret = 0; // stores mean value of measurements
-		
+
 		for(j = 0; j < NUM_MEASUREMENTS; j++)
 		{
-			ret += t[j];		
+			ret += t[j];
 		}
-		
+
 		ret /= NUM_MEASUREMENTS;
-		
+
+		if(ret > 600)
+		{
+			//fuck outliers
+			ret = 600;
+		}
+
 		if(i >= 0 && fprintf(f, "%d\n", abs(ret - base)) < 0)
 		{
 			perror("Failed to print memory access");
@@ -182,7 +188,7 @@ void profile_mem_access(volatile unsigned char* c, volatile unsigned char* ev_se
 void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set, char* filename)
 {
 	remove(filename);
-	
+
 	//move 1 page at a time, for now 24 pages should be enough
 	for(int i = 0; i < 24; i++)
 	{
@@ -224,4 +230,3 @@ int main(int argc, char* argv[])
 
 	return 0;
 }
-
