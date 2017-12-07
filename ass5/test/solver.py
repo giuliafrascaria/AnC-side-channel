@@ -7,51 +7,41 @@ import subprocess
 
 scan_filename = './scan.txt'
 MARGIN_OF_ERROR = 0.8
-
+NUM_CACHELINE_OFFSETS = 64
 
 def find_cacheline_offsets():
+	max_offset = [-1, -1, -1, -1]
+	max_value = [0, 0, 0, 0]
+
 	if not os.path.isfile(scan_filename):
 		print("scan.txt does not exist")
 		return
 
 	f = open(scan_filename, 'r')
 	scan_values = [int(line) for line in f]
-	a = np.reshape(scan_values, (-1, 64))
+	a = np.reshape(scan_values, (-1, NUM_CACHELINE_OFFSETS))
 	
 	f.close()
 	
-	sig_lv4 = []
-	sig_lv3 = []
-	sig_lv2 = []
-	sig_lv1 = []
-	
-	for (page, offset), ticks in np.ndenumerate(a):
-		if page == 0:
-			sig_lv4.append(ticks)
-			sig_lv3.append(ticks)
-			sig_lv2.append(ticks)
-			sig_lv1.append(ticks)
-		else:
-			sig_lv4[(offset + 64 - page) % 64] += ticks
-			sig_lv3[(offset + 64 - 2 * page) % 64] += ticks
-			sig_lv2[(offset + 64 - 3 * page) % 64] += ticks
-			sig_lv1[(offset + 64 - 4 * page) % 64] += ticks
-	
-	offset_lv4 = [i for i,j in enumerate(sig_lv4) if j == max(sig_lv4)]
-	offset_lv3 = [i for i,j in enumerate(sig_lv3) if j == max(sig_lv3)]
-	offset_lv2 = [i for i,j in enumerate(sig_lv2) if j == max(sig_lv2)]
-	offset_lv1 = [i for i,j in enumerate(sig_lv1) if j == max(sig_lv1)]
-	
-	offsets = []
-	offsets.append(offset_lv4[0])
-	offsets.append(offset_lv3[0])
-	offsets.append(offset_lv2[0])
-	offsets.append(offset_lv1[0])
-	return offsets
+	for offset in range(NUM_CACHELINE_OFFSETS):
+		values_per_level = [0, 0, 0, 0]
+		
+		for page_index in range(len(a)):
+			for i in range(len(values_per_level)):			
+				values_per_level[i] += a[page_index][(offset + (i + 1) * page_index) % NUM_CACHELINE_OFFSETS]
+				
+		for i in range(len(values_per_level)):
+			if values_per_level[i] > max_value[i]:
+				max_value[i] = values_per_level[i]
+				max_offset[i] = offset
+				
+	return max_offset
 
 
 def find_slot_offset(lvl):
 	filename = './scan_{0}.txt'.format(lvl)
+	max_offset = -1
+	max_value = 0
 	
 	if not os.path.isfile(filename):
 		print("{0} does not exist".format(filename))
@@ -61,21 +51,19 @@ def find_slot_offset(lvl):
 	scan_values = [int(line) for line in f]
 	a = np.reshape(scan_values, (-1, 64))
 	
-	for offset in range(64):
-		i = 0
-		j = 8
-		next_offset = (offset + 1) % 64
+	for offset in range(NUM_CACHELINE_OFFSETS):
+		values_per_level = [0, 0, 0, 0, 0, 0, 0, 0]
 		
-		while i <= 8 and a[i][offset] > MARGIN_OF_ERROR * a[i][next_offset]:
-			i += 1
-		
-		while j >= 0 and MARGIN_OF_ERROR * a[j][offset] < a[j][next_offset]:
-			j -= 1
-
-		if j == i - 1:
-			return 8 - j
-			
-	return -1
+		for i in range(len(values_per_level)):
+			for page_index in range(len(a)):
+				values_per_level[i] += a[page_index][(offset + int((page_index + i) / 8)) % NUM_CACHELINE_OFFSETS]
+				
+		for i in range(len(values_per_level)):
+			if values_per_level[i] > max_value:
+				max_value = values_per_level[i]
+				max_offset = i
+	print("{0}: {1}".format(lvl,max_offset))
+	return max_offset
 	
 	
 def make_prog():

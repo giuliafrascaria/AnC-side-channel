@@ -221,22 +221,22 @@ void scan_target(volatile unsigned char* c, volatile unsigned char* ev_set)
 
 	for(i = 0; i < 9; i++)
 	{
-		profile_mem_access(c, ev_set, i * PAGE_SIZE_PTL1, FLUSH_ALL_PTL, "scan_1.txt");
+		profile_mem_access(c, ev_set, i * (PAGE_SIZE_PTL1 + 3 * (PAGE_SIZE_PTL2 + PAGE_SIZE_PTL3 + PAGE_SIZE_PTL4)), FLUSH_ALL_PTL, "scan_1.txt");
 	}
 
 	for(i = 0; i < 9; i++)
 	{
-		profile_mem_access(c, ev_set, i * PAGE_SIZE_PTL2, FLUSH_ALL_PTL, "scan_2.txt");
+		profile_mem_access(c, ev_set, i * (PAGE_SIZE_PTL2 + 3 * (PAGE_SIZE_PTL1 + PAGE_SIZE_PTL3 + PAGE_SIZE_PTL4)), FLUSH_ALL_PTL, "scan_2.txt");
 	}
 
 	for(i = 0; i < 9; i++)
 	{
-		profile_mem_access(c, ev_set, i * PAGE_SIZE_PTL3, FLUSH_ALL_PTL, "scan_3.txt");
+		profile_mem_access(c, ev_set, i * (PAGE_SIZE_PTL3 + 3 * (PAGE_SIZE_PTL2 + PAGE_SIZE_PTL1 + PAGE_SIZE_PTL4)), FLUSH_ALL_PTL, "scan_3.txt");
 	}
 
 	for(i = 0; i < 9; i++)
 	{
-		profile_mem_access(c, ev_set, i * PAGE_SIZE_PTL4, FLUSH_ALL_PTL, "scan_4.txt");
+		profile_mem_access(c, ev_set, i * (PAGE_SIZE_PTL4 + 3 * (PAGE_SIZE_PTL2 + PAGE_SIZE_PTL3 + PAGE_SIZE_PTL1)), FLUSH_ALL_PTL, "scan_4.txt");
 	}
 }
 
