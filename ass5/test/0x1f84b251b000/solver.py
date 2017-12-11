@@ -40,7 +40,7 @@ def find_cacheline_offsets():
 	return max_offset
 
 
-def find_slot_offset(lvl, cacheline_offsets):
+def find_slot_offset(lvl, cacheline_offset):
 	filename = './scan_{0}.txt'.format(lvl)
 	max_offset = -1
 	max_value = 0
@@ -56,32 +56,23 @@ def find_slot_offset(lvl, cacheline_offsets):
 	a = np.reshape(scan_values, (-1, NUM_CACHELINE_OFFSETS))
 	la = len(a)
 	rla = range(la)
-	m = a.mean(axis=0) # store mean latencies for every page
 	
-	for i in cacheline_offsets:
+	# store maximum values for measurements for each of 8 possible PTE signal patterns
+	values_per_level = [0, 0, 0, 0, 0, 0, 0, 0]
+	l = len(values_per_level)
+	rl = range(l)
+	
+	# measure each possible pattern
+	for i in rl:
+		# iterate over measured pages
 		for page_index in rla:
-			# tune down signals for cacheline offsets
-			a[page_index][(i + page_index) % NUM_CACHELINE_OFFSETS] = m[page_index]
+			values_per_level[i] += min(a[page_index][(cacheline_offset + int((page_index + i) / l)) % NUM_CACHELINE_OFFSETS], MAX_DELAY_THRESHOLD)
 	
-	# iterate over columns (cacheline offsets)
-	for offset in range(NUM_CACHELINE_OFFSETS):
-	
-		# store maximum values for measurements for each of 8 possible PTE signal patterns
-		values_per_level = [0, 0, 0, 0, 0, 0, 0, 0]
-		l = len(values_per_level)
-		rl = range(l)
-		
-		# measure each possible pattern
-		for i in rl:
-			# iterate over measured pages
-			for page_index in rla:
-				values_per_level[i] += min(a[page_index][(offset + int((page_index + i) / l)) % NUM_CACHELINE_OFFSETS], MAX_DELAY_THRESHOLD)
-		
-		# check if patterns observed for offset are higher than already observed patterns
-		for i in rl:
-			if values_per_level[i] > max_value:
-				max_value = values_per_level[i]
-				max_offset = i
+	# check if patterns observed for offset are higher than already observed patterns
+	for i in rl:
+		if values_per_level[i] > max_value:
+			max_value = values_per_level[i]
+			max_offset = i
 	
 	return max_offset
 	
@@ -123,7 +114,7 @@ def main():
 		return -1
 	
 	for i in range(4):
-		slot = (offsets[i] << 3) | find_slot_offset(4 - i, offsets)
+		slot = (offsets[i] << 3) | find_slot_offset(4 - i, offsets[i])
 		
 		print("Slot at PTL{0}: {1}".format(4-i, slot))
 		
