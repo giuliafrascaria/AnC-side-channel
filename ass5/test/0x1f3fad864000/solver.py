@@ -4,6 +4,7 @@ from __future__ import division
 import os
 import numpy as np
 import subprocess
+import time
 
 scan_filename = './scan.txt'
 MARGIN_OF_ERROR = 0.8
@@ -137,5 +138,8 @@ def main():
 
 
 if __name__ == "__main__":
+	start = time.time()
 	main()
+	stop = time.time()
+	print("\nExecution took {0} seconds".format(stop - start))
 
