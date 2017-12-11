@@ -63,26 +63,23 @@ def find_slot_offset(lvl, cacheline_offsets):
 			# tune down signals for cacheline offsets
 			a[page_index][(i + page_index) % NUM_CACHELINE_OFFSETS] = m[page_index]
 	
-	# iterate over columns (cacheline offsets)
-	for offset in range(NUM_CACHELINE_OFFSETS):
+	# store maximum values for measurements for each of 8 possible PTE signal patterns
+	values_per_level = [0, 0, 0, 0, 0, 0, 0, 0]
+	l = len(values_per_level)
+	rl = range(l)
 	
-		# store maximum values for measurements for each of 8 possible PTE signal patterns
-		values_per_level = [0, 0, 0, 0, 0, 0, 0, 0]
-		l = len(values_per_level)
-		rl = range(l)
-		
-		# measure each possible pattern
-		for i in rl:
-			# iterate over measured pages
-			for page_index in rla:
-				values_per_level[i] += min(a[page_index][(offset + int((page_index + i) / l)) % NUM_CACHELINE_OFFSETS], MAX_DELAY_THRESHOLD)
-		
-		# check if patterns observed for offset are higher than already observed patterns
-		for i in rl:
-			if values_per_level[i] > max_value:
-				max_value = values_per_level[i]
-				max_offset = i
+	# measure each possible pattern
+	for i in rl:
+		# iterate over measured pages
+		for page_index in rla:
+			values_per_level[i] += min(a[page_index][(cacheline_offsets[4-lvl] + int((page_index + i) / l)) % NUM_CACHELINE_OFFSETS], MAX_DELAY_THRESHOLD)
 	
+	# check if patterns observed for offset are higher than already observed patterns
+	for i in rl:
+		if values_per_level[i] > max_value:
+			max_value = values_per_level[i]
+			max_offset = i
+
 	return max_offset
 	
 	
