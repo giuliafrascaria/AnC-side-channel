@@ -40,7 +40,7 @@ def find_cacheline_offsets():
 	return max_offset
 
 
-def find_slot_offset(lvl, cacheline_offset):
+def find_slot_offset(lvl, cacheline_offsets):
 	filename = './scan_{0}.txt'.format(lvl)
 	max_offset = -1
 	max_value = 0
@@ -56,11 +56,12 @@ def find_slot_offset(lvl, cacheline_offset):
 	a = np.reshape(scan_values, (-1, NUM_CACHELINE_OFFSETS))
 	la = len(a)
 	rla = range(la)
+	m = a.mean(axis=0) # store mean latencies for every page
 	
-	# store maximum values for measurements for each of 8 possible PTE signal patterns
-	values_per_level = [0, 0, 0, 0, 0, 0, 0, 0]
-	l = len(values_per_level)
-	rl = range(l)
+	for i in cacheline_offsets:
+		for page_index in rla:
+			# tune down signals for cacheline offsets
+			a[page_index][(i + page_index) % NUM_CACHELINE_OFFSETS] = m[page_index]
 	
 	# store maximum values for measurements for each of 8 possible PTE signal patterns
 	values_per_level = [0, 0, 0, 0, 0, 0, 0, 0]
@@ -119,7 +120,7 @@ def main():
 		return -1
 	
 	for i in range(4):
-		slot = (offsets[i] << 3) | find_slot_offset(4 - i, offsets[i])
+		slot = (offsets[i] << 3) | find_slot_offset(4 - i, offsets)
 		
 		print("Slot at PTL{0}: {1}".format(4-i, slot))
 		
