@@ -7,7 +7,7 @@ import numpy as np
 if len(sys.argv) > 1:
 	scan_filename = sys.argv[1]
 else:
-	scan_filename = "scan_4.txt"
+	scan_filename = "scan_2.txt"
 fig_filename = 'heatmap.png'
 
 def main():

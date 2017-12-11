@@ -8,6 +8,7 @@ import subprocess
 scan_filename = './scan.txt'
 MARGIN_OF_ERROR = 0.8
 NUM_CACHELINE_OFFSETS = 64
+MAX_DELAY_THRESHOLD = 600
 
 def find_cacheline_offsets():
 	max_offset = [-1, -1, -1, -1]
@@ -28,7 +29,7 @@ def find_cacheline_offsets():
 		
 		for page_index in range(len(a)):
 			for i in range(len(values_per_level)):			
-				values_per_level[i] += a[page_index][(offset + (i + 1) * page_index) % NUM_CACHELINE_OFFSETS]
+				values_per_level[i] += min(a[page_index][(offset + (i + 1) * page_index) % NUM_CACHELINE_OFFSETS], MAX_DELAY_THRESHOLD)
 				
 		for i in range(len(values_per_level)):
 			if values_per_level[i] > max_value[i]:
@@ -38,7 +39,7 @@ def find_cacheline_offsets():
 	return max_offset
 
 
-def find_slot_offset(lvl):
+def find_slot_offset(lvl, cacheline_offsets):
 	filename = './scan_{0}.txt'.format(lvl)
 	max_offset = -1
 	max_value = 0
@@ -49,20 +50,38 @@ def find_slot_offset(lvl):
 
 	f = open(filename, 'r')
 	scan_values = [int(line) for line in f]
-	a = np.reshape(scan_values, (-1, 64))
 	
+	# convert array of values to matrix with 64 columns
+	a = np.reshape(scan_values, (-1, NUM_CACHELINE_OFFSETS))
+	la = len(a)
+	rla = range(la)
+	m = a.mean(axis=0) # store mean latencies for every page
+	
+	for i in cacheline_offsets:
+		for page_index in rla:
+			# tune down signals for cacheline offsets
+			a[page_index][(i + page_index) % NUM_CACHELINE_OFFSETS] = m[page_index]
+	
+	# iterate over columns (cacheline offsets)
 	for offset in range(NUM_CACHELINE_OFFSETS):
+	
+		# store maximum values for measurements for each of 8 possible PTE signal patterns
 		values_per_level = [0, 0, 0, 0, 0, 0, 0, 0]
+		l = len(values_per_level)
+		rl = range(l)
 		
-		for i in range(len(values_per_level)):
-			for page_index in range(len(a)):
-				values_per_level[i] += a[page_index][(offset + int((page_index + i) / 8)) % NUM_CACHELINE_OFFSETS]
-				
-		for i in range(len(values_per_level)):
+		# measure each possible pattern
+		for i in rl:
+			# iterate over measured pages
+			for page_index in rla:
+				values_per_level[i] += min(a[page_index][(offset + int((page_index + i) / l)) % NUM_CACHELINE_OFFSETS], MAX_DELAY_THRESHOLD)
+		
+		# check if patterns observed for offset are higher than already observed patterns
+		for i in rl:
 			if values_per_level[i] > max_value:
 				max_value = values_per_level[i]
 				max_offset = i
-	print("{0}: {1}".format(lvl,max_offset))
+	
 	return max_offset
 	
 	
@@ -103,7 +122,7 @@ def main():
 		return -1
 	
 	for i in range(4):
-		slot = (offsets[i] << 3) | find_slot_offset(4 - i)
+		slot = (offsets[i] << 3) | find_slot_offset(4 - i, offsets)
 		
 		print("Slot at PTL{0}: {1}".format(4-i, slot))
 		
