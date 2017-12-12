@@ -228,7 +228,7 @@ int main(int argc, char* argv[])
 	size_t ev_set_size = 5L * TB;
 	uint64_t target_size = 96 * TB;
 	volatile unsigned char *ev_set;
-	uint64_t target_addr = 4L * TB;
+	uint64_t target_addr = 128L * TB + 213231283123L;
 	volatile unsigned char *target = (unsigned char*)mmap((void*)target_addr, target_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 	if(target == MAP_FAILED)
